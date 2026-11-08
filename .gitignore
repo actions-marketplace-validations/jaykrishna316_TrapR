@@ -1,0 +1,15 @@
+# Never commit vaults: they hold your secret key
+*.trapr-vault.md
+*.trapr-vault.md.bak
+*.trapr-commitment.json
+*.trapr-commitment.json.ots
+*-models-*.md
+*-hunt-*.md
+*-verify-*.md
+
+__pycache__/
+*.pyc
+dist/
+build/
+*.egg-info/
+.venv/

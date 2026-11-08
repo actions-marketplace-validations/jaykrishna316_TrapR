@@ -1,0 +1,30 @@
+name: ci
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+        ast: ["stdlib", "tree-sitter"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install optional AST support
+        if: matrix.ast == 'tree-sitter'
+        run: pip install ".[ast]"
+      - name: Tests
+        run: python tests/test_trapr.py
+      - name: Package installs and runs
+        run: |
+          pip install .
+          trapr --version
