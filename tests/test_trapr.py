@@ -284,6 +284,19 @@ def main() -> int:
     run("refresh", "--vault", str(vault), "--repo-dir", str(repo))
     data2 = ts.load_vault(vault)
 
+    # mark: another branch, same key; existing vault entries untouched, branch-only files added
+    br = tmp / "myproj-branch"
+    shutil.copytree(repo, br)
+    (br / "trapr.py").unlink()
+    main_rl = (repo / "myproj/ratelimit.py").read_text()
+    (br / "myproj/ratelimit.py").write_text(re.sub(rf"^# ({re.escape(data['marker_label'])}|SPDX).*\n", "", main_rl, flags=re.M))
+    (br / "myproj/branch_only.py").write_text(UTILS.replace("def ", "def b_"))
+    subprocess.run(["git", "-C", str(br), "add", "-A"], check=True)
+    before = {k: (v["ftag"], v["tok"]) for k, v in data2["files"].items()}
+    run("mark", "--vault", str(vault), "--repo-dir", str(br), "--owner", "Alice")
+    data3 = ts.load_vault(vault)
+    bo = ts.scan_file((br / "myproj/branch_only.py").read_text(), ".py", data3)
+
     checks = [
         ("protect: vault written outside the repo", vault.exists() and repo not in vault.parents),
         ("protect: every source file marked", all(re.search(rf"{data['marker_label']}: {data['ptag']}-", p.read_text())
@@ -321,6 +334,12 @@ def main() -> int:
          grade("with_broken_imports.js") == "definitive" or not (ts.HAVE_TS and shutil.which("node"))),
         ("FNV lookalike → not flagged", "lookalike.py" not in found),
         ("unrelated code → not flagged", "unrelated.py" not in found),
+        ("mark: a branch file gets exactly main's header (merges cleanly)",
+         (br / "myproj/ratelimit.py").read_text() == main_rl),
+        ("mark: existing vault entries unchanged", all(data3["files"][k]["ftag"] == f and data3["files"][k]["tok"] == t
+                                                      for k, (f, t) in before.items())),
+        ("mark: branch-only file indexed and definitive", "myproj/branch_only.py" in data3["files"]
+         and bo and bo["grade"] == "definitive"),
         ("refresh: same key, new file marked", data2["ptag"] == data["ptag"]
          and "myproj/new_module.py" in data2["files"] and data2["files"]["myproj/new_module.py"]["marked"]),
     ]

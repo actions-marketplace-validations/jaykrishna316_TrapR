@@ -49,7 +49,7 @@ import urllib.request
 from collections import Counter
 from pathlib import Path
 
-VERSION = "0.4.1"
+VERSION = "0.4.2"
 
 try:
     from tree_sitter_language_pack import get_parser as _ts_parser
@@ -1149,7 +1149,7 @@ def cmd_protect(args):
 
     # ---- fingerprints, leads, vault
     texts = {p.relative_to(root).as_posix(): read(p) for p in files}
-    data = {"version": VERSION, "name": name, "repo": gh_repo, "owners": owners, "license": args.license,
+    data = {"version": VERSION, "name": name, "repo": gh_repo, "owners": owners, "license": args.license, "spdx_owner": args.owner,
             "created": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
             "secret": base64.b64encode(secret).decode(), "ptag": ptag, "marker_label": args.marker_label,
             "primary_language": plang, "ast_engine": "tree-sitter" if HAVE_TS else "python-ast",
@@ -1223,6 +1223,36 @@ def cmd_refresh(args):
     write_vault(vault, data)
     print(f"Refreshed {vault.name}: {len(data['files'])} files fingerprinted, {added} newly marked. "
           f"Backup at {vault.with_suffix('.md.bak').name}.")
+
+
+def cmd_mark(args):
+    """Mark another branch (or any checkout) of an already-protected repo with the SAME key.
+    Existing vault entries are never changed, so main's fingerprints stay intact; files that exist
+    only on this branch are added to the index so their markers are definitive too."""
+    vault = Path(args.vault).resolve()
+    data = load_vault(vault)
+    root = Path(args.repo_dir).resolve()
+    secret = base64.b64decode(data["secret"])
+    files = repo_files(root, {Path(__file__).resolve(), vault})
+    lic = None if args.no_spdx else (args.license or data.get("license"))
+    spdx = {"license": lic, "owner": args.owner or data.get("spdx_owner")} if lic else None
+    label = data.get("marker_label", "build-ref")
+    marked = sum(1 for p in files if not re.search(rf"\b{data['ptag']}-[0-9a-f]{{8}}\b", read(p)))
+    new = [p for p in files if p.relative_to(root).as_posix() not in data["files"]]
+    if args.dry_run:
+        print(f"Dry run: {marked} file(s) would be marked, {len(new)} branch-only file(s) added to the vault index.")
+        return
+    for p in files:
+        add_marker(p, root, secret, data["ptag"], label, spdx)
+    if new:
+        data["files"].update(build_index(root, new, secret, data["ptag"], data["canaries"]))
+        data["queries"] = build_queries(data)
+        if spdx and spdx.get("owner"):
+            data.setdefault("spdx_owner", spdx["owner"])
+        data["refreshed"] = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+        shutil.copy(vault, vault.with_suffix(".md.bak"))
+        write_vault(vault, data)
+    print(f"Marked {marked} file(s) in {root.name}; {len(new)} branch-only file(s) added to {vault.name}.")
 
 
 # ============================================================================ scanning
@@ -1992,6 +2022,15 @@ def main():
     p.add_argument("--vault", required=True)
     p.add_argument("--repo-dir", default=".")
     p.add_argument("--no-markers", action="store_true", help="don't mark new files")
+
+    p = sub.add_parser("mark", help="mark another branch with the same key (vault entries are only added, never changed)")
+    p.set_defaults(fn=cmd_mark)
+    p.add_argument("--vault", required=True)
+    p.add_argument("--repo-dir", default=".")
+    p.add_argument("--license", help="SPDX license id (default: the one used at protect)")
+    p.add_argument("--owner", help="copyright holder for SPDX headers")
+    p.add_argument("--no-spdx", action="store_true")
+    p.add_argument("--dry-run", action="store_true")
 
     p = sub.add_parser("verify", help="check a file, folder, git URL, or GitHub file URL")
     p.set_defaults(fn=cmd_verify)

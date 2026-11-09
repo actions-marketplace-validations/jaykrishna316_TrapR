@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.2 (2026-11-09)
+
+- **New `mark` command:** protect other branches with the same key. Run it on a checkout of any branch: files
+  get exactly the header they have on main (so the branches still merge cleanly), and files that exist only on
+  that branch are added to the vault index so their markers stay definitive. Existing vault entries are never
+  changed. Canaries are left to main; branches pick them up when they merge it.
+- The SPDX copyright owner is now stored in the vault, so `mark` can reuse it.
+
 ## 0.4.1 (2026-11-07)
 
 - **Fix:** in a git repo, `protect` and `refresh` now touch only files git tracks. Before, they also marked

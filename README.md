@@ -66,6 +66,7 @@ The vault tells the agent which lines to read, which searches to run (`gh`, GitH
 trapr hunt   --vault neo.trapr-vault.md            # GitHub code search + forks + PyPI + npm, verifies every hit
 trapr verify --vault neo.trapr-vault.md <target>   # a file, folder, git URL, or GitHub file URL
 trapr refresh --vault neo.trapr-vault.md --repo-dir ~/code/neo   # after big changes (same key)
+trapr mark    --vault neo.trapr-vault.md --repo-dir ~/code/neo   # another branch, same key
 ```
 `hunt` searches four places: GitHub code search, your **fork network** (forks aren't in code search; it flags forks that
 removed your LICENSE or stripped markers), and **PyPI and npm** packages with similar names, downloaded and scanned
@@ -220,3 +221,9 @@ What TrapR adds is the **maintainer-side workflow**: one command to plant everyt
 ## Contributing
 
 Issues and PRs welcome. The rules are in [AGENTS.md](AGENTS.md#contributing-only-if-youre-working-on-TrapR-itself): one file, zero required dependencies, tests must pass, and detection changes need false-positive numbers.
+
+---
+
+<p align="center">
+  <img src="assets/trapr-banner.svg" alt="Code fingerprinted: TrapR traceable markers and behavioral canaries" width="100%">
+</p>
