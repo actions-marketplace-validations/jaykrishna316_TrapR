@@ -421,13 +421,15 @@ def main() -> int:
             self.send_response(200); self.send_header("Content-Length", str(len(body))); self.end_headers()
             self.wfile.write(body)
         def do_GET(self):
-            self._send({"models": [{"name": "memorizer"}, {"name": "honest"}]})
+            self._send({"models": [{"name": "memorizer"}, {"name": "honest"}, {"name": "rambler"}]})
         def do_POST(self):
             req = _json.loads(self.rfile.read(int(self.headers["Content-Length"])))
             code = req["messages"][-1]["content"].split("```", 1)[1]
             name = re.search(r"(?:def|function)\s+(\w+)", code).group(1)
             ck = canary_by_name[name]
-            if req["model"] == "memorizer":
+            if req["model"] == "rambler":
+                text = "Let me think about how this hash might work... it probably uses a seed and a multiplier."
+            elif req["model"] == "memorizer":
                 text = "```\n" + ts.canary_render(ck["lang"], name, {**ck, "variant": [2, 3, 0, 2]}) + "```"
             else:
                 text = f"```\ndef {name}(k, n):\n    return sum(k.encode()) % n\n```"
@@ -444,7 +446,7 @@ def main() -> int:
     results = {}
     for prov, url in (("ollama", base), ("openai", base + "/v1"), ("anthropic", base)):
         rep_path = tmp / f"models-{prov}.md"
-        A = type("A", (), {"vault": str(vault), "provider": prov, "model": None if prov == "ollama" else ["memorizer", "honest"],
+        A = type("A", (), {"vault": str(vault), "provider": prov, "model": None if prov == "ollama" else ["memorizer", "honest", "rambler"],
                            "base_url": url, "api_key": "k", "samples": 2, "report": str(rep_path)})
         ts.cmd_probe_models(A())
         results[prov] = rep_path.read_text()
@@ -452,7 +454,11 @@ def main() -> int:
     n_can = len(data["canaries"])
     checks += [(f"probe-models ({prov}): memorizing model caught on all {n_can} canaries, honest model cleared",
                 txt.count("reproduced your canary") == n_can and "`honest`" in txt
-                and not re.search(r"`honest`[^\n]*reproduced your canary", txt))
+                and not re.search(r"`honest`[^\n]*reproduced your canary", txt)
+                and len(re.findall(r"`honest`[^\n]*not reproduced", txt)) == n_can)
+               for prov, txt in results.items()]
+    checks += [(f"probe-models ({prov}): a model that returns no code is reported inconclusive, not cleared",
+                len(re.findall(r"`rambler`[^\n]*inconclusive", txt)) == n_can)
                for prov, txt in results.items()]
 
     # ---- timestamps: a fake calendar answers like a real one; the proof must parse in the reference library

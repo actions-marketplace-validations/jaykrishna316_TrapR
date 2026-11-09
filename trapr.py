@@ -1846,10 +1846,18 @@ def probe_prompt(data: dict, c: dict, with_project: bool) -> str:
 def ask_model(provider: str, model: str, prompt: str, temperature: float, seed: int, args) -> str:
     msgs = [{"role": "user", "content": prompt}]
     if provider == "ollama":
-        r = post_json(f"{args.base_url or 'http://localhost:11434'}/api/chat",
-                      {"model": model, "messages": msgs, "stream": False,
-                       "options": {"temperature": temperature, "seed": seed, "num_predict": 900}}, {})
-        return r.get("message", {}).get("content", "")
+        url = f"{args.base_url or 'http://localhost:11434'}/api/chat"
+        body = {"model": model, "messages": msgs, "stream": False, "think": False,   # thinking models: answer directly
+                "options": {"temperature": temperature, "seed": seed, "num_predict": 2048}}
+        try:
+            r = post_json(url, body, {}, timeout=900)          # local CPUs can be slow
+        except urllib.error.HTTPError as e:
+            if e.code != 400:
+                raise
+            body.pop("think")                                   # older Ollama or a model without the option
+            r = post_json(url, body, {}, timeout=900)
+        msg = r.get("message", {})
+        return msg.get("content", "") or msg.get("thinking", "")
     if provider == "openai":
         key = args.api_key or os.environ.get("OPENAI_API_KEY", "")
         base = (args.base_url or "https://api.openai.com/v1").rstrip("/")
@@ -1906,7 +1914,7 @@ def cmd_probe_models(args):
     rows, hits = [], 0
     for model in models:
         for cname, c in canaries.items():
-            best, consts, errors = 0, set(), 0
+            best, consts, errors, usable = 0, set(), 0, 0
             for i in range(args.samples):
                 prompt = probe_prompt(data, c, with_project=(i % 2 == 0))
                 try:
@@ -1918,12 +1926,18 @@ def cmd_probe_models(args):
                 code = extract_code(reply, c)
                 consts |= set(constant_hits(code, c))
                 ext = ".py" if c["lang"] == "py" else ".js"
-                for b in canary_behavior(*harness(code, ext), c["lang"], {cname: c}):
-                    best = max(best, b["matched"])
+                src, names = harness(code, ext)
+                outputs = run_harness(src, names, c["lang"], c["probes"])
+                if outputs:            # the reply held a function that actually ran and returned numbers
+                    usable += 1
+                for got in outputs.values():
+                    best = max(best, sum(a == b for a, b in zip(got, c["expected"])))
                 if best == len(c["expected"]):
                     break
             if errors == args.samples:
                 verdict = f"⚠️ error: {last_error}"
+            elif best == 0 and not consts and not usable:
+                verdict = "⚠️ inconclusive: no runnable code in the reply (try --samples 3 or another model)"
             elif best == len(c["expected"]):
                 verdict, hits = "🔴 **reproduced your canary**", hits + 1
             elif best or len(consts) >= 1:
@@ -1940,7 +1954,8 @@ def cmd_probe_models(args):
         "Each model was shown only a canary's signature and docstring and asked to finish it. Its answer was run "
         "on six secret inputs. Producing all six secret outputs without having seen your code has a chance of "
         "about 1 in 2^186, so a full match means the model saw the code: in training, or by fetching it live "
-        "(a model with web or repo access). A miss is not proof the code wasn't trained on.", "",
+        "(a model with web or repo access). A miss is not proof the code wasn't trained on. \"Inconclusive\" means "
+        "the model never returned a function that ran, so the canary wasn't really tested.", "",
         "| Model | Canary | Result |", "|---|---|---|", *rows, ""]), encoding="utf-8")
     print(f"\n📝 Report: {out}")
 

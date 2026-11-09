@@ -6,6 +6,9 @@
   untracked local files (scratch scripts, experiments) and fingerprinted them into the vault.
 - **Python 3.10+.** Python 3.9 reached end of life in October 2025 and is no longer available on GitHub's
   Ubuntu 26.04 runners. CI now covers 3.10–3.14. GitHub Actions updated to their current Node 24 versions.
+- **`probe-models` is more honest about non-answers.** A model that never returns a function that runs is now
+  reported as "inconclusive" instead of "not reproduced". Ollama requests turn off thinking mode (falling back
+  for older servers), allow longer answers, and wait up to 15 minutes for slow local CPUs.
 
 ## 0.4.0 (2026-11-07)
 
