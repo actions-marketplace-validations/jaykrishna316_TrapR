@@ -208,4 +208,8 @@ Issues and PRs welcome. The rules are in [AGENTS.md](AGENTS.md#contributing-only
 
 ---
 
-Built by [Jayakrishna Ichapurapu](https://www.linkedin.com/in/jayakrishnaichapurapu/) · Primeape94 Lab · MIT License
+<p align="center">
+  <img src="assets/primeape94-mark.svg" width="110" alt="Primeape94 Lab mark">
+  <br>
+  <sub>Built by <a href="https://www.linkedin.com/in/jayakrishnaichapurapu/">Jayakrishna Ichapurapu</a> · <b>Primeape94 Lab</b> · MIT License</sub>
+</p>
