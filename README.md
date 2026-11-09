@@ -220,11 +220,3 @@ What TrapR adds is the **maintainer-side workflow**: one command to plant everyt
 ## Contributing
 
 Issues and PRs welcome. The rules are in [AGENTS.md](AGENTS.md#contributing-only-if-youre-working-on-TrapR-itself): one file, zero required dependencies, tests must pass, and detection changes need false-positive numbers.
-
----
-
-<p align="center">
-  <img src="assets/primeape94-mark.svg" width="110" alt="Primeape94 Lab mark">
-  <br>
-  <sub>Built by <a href="https://www.linkedin.com/in/jayakrishnaichapurapu/">Jayakrishna Ichapurapu</a> · <b>Primeape94 Lab</b> · MIT License</sub>
-</p>
