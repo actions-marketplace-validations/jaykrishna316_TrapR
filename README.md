@@ -3,7 +3,7 @@
 **Plant traceable fingerprints in your open-source code, then hunt for copies, with your own CLI or with an AI agent.**
 
 [![ci](https://github.com/jaykrishna316/TrapR/actions/workflows/ci.yml/badge.svg)](https://github.com/jaykrishna316/TrapR/actions/workflows/ci.yml)
-![python](https://img.shields.io/badge/python-3.9%2B-blue) ![deps](https://img.shields.io/badge/dependencies-zero-brightgreen) ![license](https://img.shields.io/badge/license-MIT-green)
+![python](https://img.shields.io/badge/python-3.10%2B-blue) ![deps](https://img.shields.io/badge/dependencies-zero-brightgreen) ![license](https://img.shields.io/badge/license-MIT-green)
 
 Mapmakers used to draw fake "trap streets", roads that don't exist, to prove when someone copied their map. **TrapR** does the same for code.
 
@@ -129,7 +129,7 @@ reveals nothing, so you can publish it. A few hours later, `ots upgrade` and `ot
 
 Test suite: `python3 tests/test_trapr.py`: 39 checks, including mocked GitHub search and forks, malicious archives,
 three model-API wire formats, a timestamp proof parsed by the official OpenTimestamps library, and all 1,152 canary
-kind × style combinations. CI runs it on Python 3.9–3.13, with and without tree-sitter.
+kind × style combinations. CI runs it on Python 3.10–3.14, with and without tree-sitter.
 
 ## How verification stays safe
 
@@ -158,7 +158,7 @@ probe-models --provider ollama|openai|anthropic --model NAME --base-url URL --sa
 timestamp    --swh                        also ask Software Heritage to archive the public repo
 ```
 
-**Dependencies:** none (Python 3.9+). Optional `pip install tree-sitter tree-sitter-language-pack` adds AST fingerprints for 18 languages and JS canary verification. Node.js is needed to run JS canary checks.
+**Dependencies:** none (Python 3.10+). Optional `pip install tree-sitter tree-sitter-language-pack` adds AST fingerprints for 18 languages and JS canary verification. Node.js is needed to run JS canary checks.
 
 ## Security model: what a copier who has read this README can do
 

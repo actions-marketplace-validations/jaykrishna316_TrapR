@@ -7,7 +7,7 @@ name = "trapr"
 version = "0.4.1"
 description = "Plant traceable fingerprints in your open-source code and hunt for copies, with a CLI or an AI agent."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "Jayakrishna Ichapurapu" }]
 keywords = ["watermark", "canary", "plagiarism", "attribution", "open-source", "license-compliance", "winnowing"]

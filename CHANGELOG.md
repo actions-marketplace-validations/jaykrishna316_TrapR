@@ -4,6 +4,8 @@
 
 - **Fix:** in a git repo, `protect` and `refresh` now touch only files git tracks. Before, they also marked
   untracked local files (scratch scripts, experiments) and fingerprinted them into the vault.
+- **Python 3.10+.** Python 3.9 reached end of life in October 2025 and is no longer available on GitHub's
+  Ubuntu 26.04 runners. CI now covers 3.10–3.14. GitHub Actions updated to their current Node 24 versions.
 
 ## 0.4.0 (2026-11-07)
 

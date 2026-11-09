@@ -86,7 +86,7 @@ Open the user's vault, read only the line range its header names, and follow its
 
 ## Contributing (only if you're working on TrapR itself)
 
-- Everything ships as one file, `trapr.py`, with **zero required dependencies**, on Python 3.9+.
+- Everything ships as one file, `trapr.py`, with **zero required dependencies**, on Python 3.10+.
   Keep it that way. tree-sitter stays optional.
 - Run `python3 tests/test_trapr.py` before and after changes; all checks must pass, with and
   without tree-sitter installed.

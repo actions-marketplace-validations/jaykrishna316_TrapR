@@ -22,7 +22,7 @@ Later, from anywhere:
 Or open the vault in Claude Code (or any agent with GitHub access) and say:
 "Follow the playbook in this file."
 
-Zero dependencies (Python 3.9+). Optional: `pip install tree-sitter tree-sitter-language-pack`
+Zero dependencies (Python 3.10+). Optional: `pip install tree-sitter tree-sitter-language-pack`
 adds AST fingerprints for non-Python languages; Node.js lets it verify JavaScript canaries.
 """
 from __future__ import annotations
