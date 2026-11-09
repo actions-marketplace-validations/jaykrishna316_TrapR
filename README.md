@@ -120,23 +120,31 @@ reveals nothing, so you can publish it. A few hours later, `ots upgrade` and `ot
 
 ## Tested on Neo and Braxis
 
+Retested on 2026-11-08 with v0.4.1, on fresh clones of Neo (`main`, 283 files protected) and Braxis (61 files),
+3 canaries each.
+
 | Copier did this | Result |
 |---|---|
 | Copied 2 Neo files verbatim | 🔴 2/2 definitive (markers) |
-| Copied all 54 files of Neo's `core/`, stripped every marker and SPDX line | 🔴 1 definitive (canary) + 🟠 51 strong; the 2 misses are near-empty `__init__.py` |
+| Copied all 54 files of Neo's `core/`, stripped every marker and SPDX line | 🔴 1 definitive (canary) + 🟠 51 strong; the 2 misses are 13-line `__init__.py` files |
 | Took the 3 Neo files carrying canaries, stripped markers (their imports don't resolve elsewhere) | 🔴 3/3 definitive, each by its own canary |
-| Rewrote 3 Neo files with the AST: every identifier renamed, docstrings and comments removed, reformatted | 🟠 3/3 strong (75–95% structural match) |
-| Reimplemented Neo's canary with `functools.reduce`, decimal constants, inside a class method | 🔴 definitive (6/6 probes) |
+| Rewrote 3 Neo files with the AST: 37–87 identifiers renamed per file, docstrings and comments removed, reformatted | 🟠 3/3 strong (83–95% structural match) |
+| Reimplemented each of Neo's 3 canaries by hand: a JavaScript port using `forEach`, a class method with class constants, a `while` loop, all with decimal constants | 🔴 3/3 definitive (6/6 probes each) |
 | Took only `braxis.py`, stripped markers | 🔴 definitive (canary + 100% structure) |
-| A suspect file with a booby-trapped `open("PWNED")` at module level | Caught. **The trap never ran.** |
-| **False positives:** itsdangerous, uvicorn, rich, requests, click, typer, httpx, attrs, structlog, pip-tools | **0 flagged across 10 repos** |
-| Neo and Braxis test suites after `protect` (3 canaries each) | Identical to before (183 passed / 26 passed) |
-| **Registries, live:** pretended to own `itsdangerous` and `@sindresorhus/slugify` | The real PyPI and npm packages flagged (12 and 2 files, 100% match); lookalikes like `types-itsdangerous`, `slugify`, `react-slugify` not flagged |
-| **Model probes** against a server speaking the Ollama, OpenAI and Anthropic APIs | A model returning the canary: caught on every canary. A model that hadn't seen it: cleared on every canary |
+| Prepended a booby-trapped `open("PWNED")` to a copied Neo canary file | 🔴 Caught. **The trap never ran.** |
+| **False positives:** itsdangerous, uvicorn, rich, requests, click, typer, httpx, attrs, structlog, pip-tools, checked against both the Neo and Braxis vaults | **0 flagged across 20 checks.** Closest unrelated file: 32%, against a tiny archived Neo test fixture; every other file 13% or less (threshold 35%) |
+| Neo and Braxis test suites after `protect` | Identical to before (Neo: 183 passed; Braxis: 26 passed; the same pre-existing failures on both sides) |
+| **Registries, live:** pretended to own `itsdangerous` and `@sindresorhus/slugify` | The real PyPI and npm packages flagged (12 and 2 files, 100% match); 9 lookalikes such as `types-itsdangerous`, `more-itsdangerous`, `slugify` and `react-slugify` not flagged |
+| **Model probes, live with Ollama** (`qwen2.5:3b`, `qwen3.5:4b`) on Neo's canaries | No false alarms: 6/6 probe runs cleared. Positive control: when the model was shown a canary and asked to copy it, TrapR caught 3/3, each 6/6 secret probes |
+| Model probes against a server speaking the Ollama, OpenAI and Anthropic APIs | A model returning the canary: caught on every canary. A model that hadn't seen it: cleared. A model that returned no code: reported inconclusive |
+| **Timestamp, live:** Neo's commitment submitted to OpenTimestamps | Accepted by all 4 public calendars |
 
-Test suite: `python3 tests/test_trapr.py`: 39 checks, including mocked GitHub search and forks, malicious archives,
+Test suite: `python3 tests/test_trapr.py`: 43 checks, including mocked GitHub search and forks, malicious archives,
 three model-API wire formats, a timestamp proof parsed by the official OpenTimestamps library, and all 1,152 canary
-kind × style combinations. CI runs it on Python 3.10–3.14, with and without tree-sitter.
+kind × style combinations. CI runs it on Python 3.10–3.14, with and without tree-sitter, and passes on all 10 jobs.
+
+**Not yet tested live:** GitHub code search and fork crawling inside `hunt` (tested against mocked GitHub APIs only),
+and probing cloud models.
 
 ## How verification stays safe
 
@@ -186,9 +194,9 @@ See [SECURITY.md](SECURITY.md) for the full threat model.
 - **Lead queries** (distinctive strings and identifiers) also match legitimate users of your project. They are leads, not evidence.
 - **Model probes only catch memorization or live retrieval.** A model trained on your repo but unable to recite the
   canary passes. That's the expected outcome for most models and one repo; nothing today can prove that case.
-- **Model probes and the fork crawl were tested against mocked APIs** built from the official formats. Your first
-  real run is their first live run; please report problems.
-- **The vault is large** (250 KB for Braxis, 790 KB for Neo) because it carries fingerprints. Agents are told to read only the first few hundred lines.
+- **`hunt`'s GitHub code search and fork crawl have only run against mocked GitHub APIs** built from the official
+  formats; model probes have run live against Ollama, but not yet against cloud APIs. Please report problems.
+- **The vault is large** (about 260 KB for Braxis and 790 KB for Neo) because it carries fingerprints. Agents are told to read only the first few hundred lines.
 - **Lose the vault and you lose the proof.** Back it up. With `--force`, `protect` makes a new key and the old markers become unprovable.
 - **MIT/Apache permit copying.** You're detecting missing attribution. This is evidence gathering, not legal advice.
 
