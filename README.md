@@ -1,3 +1,10 @@
+<p align="center">
+  <img src="assets/primeape94-mark.svg" width="110" alt="Primeape94 Lab mark">
+  <br>
+  <sub>Built by <a href="https://www.linkedin.com/in/jayakrishnaichapurapu/">Jayakrishna Ichapurapu</a> · <b>Primeape94 Lab</b> · MIT License</sub>
+</p>
+
+
 # TrapR
 
 **Plant traceable fingerprints in your open-source code, then hunt for copies, with your own CLI or with an AI agent.**
