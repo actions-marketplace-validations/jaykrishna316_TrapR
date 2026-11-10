@@ -297,6 +297,24 @@ def main() -> int:
     data3 = ts.load_vault(vault)
     bo = ts.scan_file((br / "myproj/branch_only.py").read_text(), ".py", data3)
 
+    # hidden folders: skipped by default, protected when included (but never their node_modules)
+    for rel in (".claude/hook.py", ".claude/node_modules/dep.js", ".vscode/settings_helper.py"):
+        (br / rel).parent.mkdir(parents=True, exist_ok=True)
+        (br / rel).write_text(UTILS.replace("def ", "def h_") if rel.endswith(".py") else "module.exports = 1;\n")
+    subprocess.run(["git", "-C", str(br), "add", "-f", "-A"], check=True)
+    run("mark", "--vault", str(vault), "--repo-dir", str(br))
+    hidden_default = data["ptag"] in (br / ".claude/hook.py").read_text()
+    run("mark", "--vault", str(vault), "--repo-dir", str(br), "--include-dir", ".claude")
+    data4 = ts.load_vault(vault)
+    # the main branch changes a file; --update-existing refreshes its fingerprints, plain mark doesn't
+    old_fp = data4["files"]["myproj/utils.py"]["tok"]
+    (br / "myproj/utils.py").write_text((br / "myproj/utils.py").read_text() + RATELIMIT.replace("TokenBucket", "Extra"))
+    run("mark", "--vault", str(vault), "--repo-dir", str(br))
+    same_without_flag = ts.load_vault(vault)["files"]["myproj/utils.py"]["tok"] == old_fp
+    run("mark", "--vault", str(vault), "--repo-dir", str(br), "--update-existing")
+    data5 = ts.load_vault(vault)
+    gate = run("gate-workflow", "--vault", str(vault), "--vaults-repo", "alice/vaults", "--branch", "main")
+
     checks = [
         ("protect: vault written outside the repo", vault.exists() and repo not in vault.parents),
         ("protect: every source file marked", all(re.search(rf"{data['marker_label']}: {data['ptag']}-", p.read_text())
@@ -340,6 +358,17 @@ def main() -> int:
                                                       for k, (f, t) in before.items())),
         ("mark: branch-only file indexed and definitive", "myproj/branch_only.py" in data3["files"]
          and bo and bo["grade"] == "definitive"),
+        ("hidden folders: skipped unless included", not hidden_default
+         and data["ptag"] in (br / ".claude/hook.py").read_text() and ".claude/hook.py" in data4["files"]),
+        ("hidden folders: included folder's node_modules and other hidden folders stay untouched",
+         (br / ".claude/node_modules/dep.js").read_text() == "module.exports = 1;\n"
+         and data["ptag"] not in (br / ".vscode/settings_helper.py").read_text()
+         and data4.get("include_dirs") == [".claude"]),
+        ("mark --update-existing: changed file re-fingerprinted (only with the flag)", same_without_flag
+         and data5["files"]["myproj/utils.py"]["tok"] != old_fp and "myproj/branch_only.py" in data5["files"]),
+        ("gate-workflow: a pull-request check that carries the tag but never the key",
+         "name: trapr-gate" in gate and data["ptag"] in gate and data["secret"] not in gate
+         and "secrets.TRAPR_DISPATCH_TOKEN" in gate and '".claude"' in gate),
         ("refresh: same key, new file marked", data2["ptag"] == data["ptag"]
          and "myproj/new_module.py" in data2["files"] and data2["files"]["myproj/new_module.py"]["marked"]),
     ]

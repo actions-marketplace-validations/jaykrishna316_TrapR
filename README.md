@@ -107,6 +107,22 @@ reveals nothing, so you can publish it. A few hours later, `ots upgrade` and `ot
 `pip install opentimestamps-client`) prove the date to anyone. `trapr timestamp --vault … --swh` re-stamps and asks
 [Software Heritage](https://archive.softwareheritage.org) to archive your public repo as an independent witness.
 
+**Option D: make marking a merge prerequisite.** Every new file should carry a build reference before it
+reaches main. Two pieces, and your public repo never holds the key:
+
+1. In the protected repo, add the check `trapr gate-workflow` prints and make **trapr-gate** a required
+   status check. It fails while any source file lacks a build reference.
+2. In your private vaults repo, add [`trapr-sync.yml`](examples/vaults-repo/trapr-sync.yml) and
+   [`trapr_sync.py`](examples/vaults-repo/trapr_sync.py), list your repos in `trapr-sync.json`, and give it a
+   fine-grained token with write access to them. When the gate fails, the sync marks the pull request's
+   branch with a comment-only commit and the check passes. It also keeps the vault's fingerprints current.
+
+```bash
+trapr gate-workflow --vault neo.trapr-vault.md --vaults-repo you/trapr-vaults --branch main > .github/workflows/trapr-gate.yml
+```
+Pull requests from forks can't be marked by the bot (it can't push to someone else's fork): mark those
+locally with `trapr mark` before merging.
+
 ## Five layers of evidence
 
 | Layer | Survives | Grade when it fires |
@@ -139,6 +155,7 @@ Retested on 2026-11-08 with v0.4.1, on fresh clones of Neo (`main`, 283 files pr
 | **Model probes, live with Ollama** (`qwen2.5:3b`, `qwen3.5:4b`) on Neo's canaries | No false alarms: 6/6 probe runs cleared. Positive control: when the model was shown a canary and asked to copy it, TrapR caught 3/3, each 6/6 secret probes |
 | Model probes against a server speaking the Ollama, OpenAI and Anthropic APIs | A model returning the canary: caught on every canary. A model that hadn't seen it: cleared. A model that returned no code: reported inconclusive |
 | **Timestamp, live:** Neo's commitment submitted to OpenTimestamps | Accepted by all 4 public calendars |
+| **Merge gate, live** on a throwaway GitHub repo: `main` requires a green `trapr-gate`, then a pull request adds an unmarked file | The check failed and named the file; the private sync marked the branch with a 3-line comment-only commit; the check passed. **34 seconds, nobody touched anything.** The key never left the private vaults repo |
 
 Test suite: `python3 tests/test_trapr.py`: 43 checks, including mocked GitHub search and forks, malicious archives,
 three model-API wire formats, a timestamp proof parsed by the official OpenTimestamps library, and all 1,152 canary
@@ -165,6 +182,7 @@ protect  --license MIT --owner "Name"     SPDX headers (omit for markers only)
          --no-timestamp                   don't submit the commitment to OpenTimestamps
          --canary-lang auto|py|js|ts|none
          --marker-label rev               the comment label (default: picked per project)
+         --include-dir .claude            also protect a hidden folder (repeatable)
          --exclude-owner myorg            extra owners to ignore in results (repeatable)
          --vault PATH                     default: ../<repo>.trapr-vault.md
          --no-markers --no-spdx --dry-run --force

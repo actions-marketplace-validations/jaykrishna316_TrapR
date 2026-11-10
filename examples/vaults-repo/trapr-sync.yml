@@ -1,0 +1,62 @@
+# Keeps TrapR markers and fingerprints current on your protected repos.
+# Put this in your PRIVATE vaults repo:
+#
+#   trapr-vaults/          (private!)
+#   ├── Neo.trapr-vault.md
+#   ├── trapr-sync.json    which repos and branches to keep marked
+#   ├── tools/trapr.py     a copy of TrapR
+#   ├── tools/trapr_sync.py
+#   └── .github/workflows/trapr-sync.yml   ← this file
+#
+# Secret needed: TRAPR_PUSH_TOKEN, a fine-grained personal access token limited to the protected
+# repos, with "Contents: Read and write" and "Pull requests: Read and write".
+# Pair it with the trapr-gate check in each protected repo (`trapr gate-workflow`), made a required
+# status check, so nothing reaches the guarded branches without its build references. The key never leaves
+# this private repo; the protected repos get only comment lines.
+
+name: trapr sync
+on:
+  schedule:
+    - cron: "41 */6 * * *"   # every 6 hours; pull requests are marked at once when the gate asks
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "only this pull request number (sent by the trapr-gate check)"
+        required: false
+      repo:
+        description: "owner/name of the repo the pull request is in"
+        required: false
+
+permissions:
+  contents: write          # to commit the updated vaults back to this repo
+
+concurrency: trapr-sync
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Refuse to run in a public repository
+        if: ${{ github.event.repository.private != true }}
+        run: |
+          echo "::error::This workflow handles your vault's secret key. Run it only in a private repository."
+          exit 1
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Mark new files and refresh fingerprints
+        env:
+          GH_TOKEN: ${{ secrets.TRAPR_PUSH_TOKEN }}
+          TRAPR_PR: ${{ inputs.pr }}
+          TRAPR_PR_REPO: ${{ inputs.repo }}
+        run: python3 tools/trapr_sync.py trapr-sync.json
+      - name: Commit updated vaults
+        if: ${{ always() }}
+        run: |
+          git add -- '*.trapr-vault.md'
+          if git diff --cached --quiet; then echo "Vaults unchanged."; exit 0; fi
+          git -c user.name=trapr-bot -c user.email=41898282+github-actions[bot]@users.noreply.github.com \
+            commit -q -m "Vaults: sync $(date -u +%F)"
+          git push -q

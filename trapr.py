@@ -91,10 +91,26 @@ TOKEN_RE = re.compile(
 )
 
 
-def source_files(root: Path, exclude: set[Path] = frozenset()):
+def source_files(root: Path, exclude: set[Path] = frozenset(), include: tuple[str, ...] = ()):
+    """Source files under root. Hidden and tool folders are skipped unless listed in `include`
+    (paths relative to root, e.g. ".claude" or ".vscode/my-extension")."""
+    inc = {i.strip("/") for i in include if i.strip("/")}
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = sorted(d for d in dirnames if d not in SKIP_DIRS and not d.startswith(".")
-                             or d in (".github",))
+        rel = Path(dirpath).relative_to(root).as_posix()
+        rel = "" if rel == "." else rel
+        kept = []
+        for d in sorted(dirnames):
+            dr = f"{rel}/{d}" if rel else d
+            if (d not in SKIP_DIRS and not d.startswith(".")) or d == ".github" or dr in inc \
+                    or any(i.startswith(dr + "/") for i in inc) \
+                    or (d not in SKIP_DIRS and any(dr.startswith(i + "/") for i in inc)):
+                kept.append(d)
+        dirnames[:] = kept
+        # inside a hidden folder that is only an ancestor of an included one, take no files
+        parts = rel.split("/") if rel else []
+        hidden = [i for i, x in enumerate(parts) if x.startswith(".") and x != ".github" or x in SKIP_DIRS]
+        if hidden and not any(rel == i or rel.startswith(i + "/") for i in inc):
+            continue
         for f in sorted(filenames):
             p = Path(dirpath) / f
             if p.suffix.lower() in COMMENT and p.resolve() not in exclude:
@@ -944,10 +960,10 @@ def serializable(data: dict) -> dict:
 
 
 # ============================================================================ protect / refresh
-def repo_files(root: Path, exclude: set[Path]) -> list[Path]:
+def repo_files(root: Path, exclude: set[Path], include: tuple[str, ...] = ()) -> list[Path]:
     """Source files to protect. In a git repo, only files git tracks: never your untracked local
     scratch work, and nothing .gitignore excludes."""
-    files = list(source_files(root, exclude))
+    files = list(source_files(root, exclude, include))
     try:
         r = subprocess.run(["git", "-C", str(root), "ls-files", "-z"], capture_output=True, text=True, timeout=60)
     except Exception:
@@ -1091,7 +1107,8 @@ def cmd_protect(args):
         sys.exit(f"Vault already exists: {vault}\nUse `refresh --vault {vault}` to update it, or --force to start over "
                  "(a new key makes the old markers unprovable).")
     exclude = {me, vault}
-    files = repo_files(root, exclude)
+    include = tuple(args.include_dir or ())
+    files = repo_files(root, exclude, include)
     if not files:
         sys.exit(f"No source files found under {root}.")
     secret = secrets.token_bytes(32)
@@ -1149,7 +1166,7 @@ def cmd_protect(args):
 
     # ---- fingerprints, leads, vault
     texts = {p.relative_to(root).as_posix(): read(p) for p in files}
-    data = {"version": VERSION, "name": name, "repo": gh_repo, "owners": owners, "license": args.license, "spdx_owner": args.owner,
+    data = {"version": VERSION, "name": name, "repo": gh_repo, "owners": owners, "license": args.license, "spdx_owner": args.owner, "include_dirs": list(include),
             "created": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
             "secret": base64.b64encode(secret).decode(), "ptag": ptag, "marker_label": args.marker_label,
             "primary_language": plang, "ast_engine": "tree-sitter" if HAVE_TS else "python-ast",
@@ -1209,7 +1226,8 @@ def cmd_refresh(args):
     data = load_vault(vault)
     root = Path(args.repo_dir).resolve()
     secret = base64.b64decode(data["secret"])
-    files = repo_files(root, {Path(__file__).resolve(), vault})
+    data["include_dirs"] = sorted({*data.get("include_dirs", []), *(args.include_dir or [])})
+    files = repo_files(root, {Path(__file__).resolve(), vault}, tuple(data["include_dirs"]))
     added = 0
     if not args.no_markers:
         for p in files:
@@ -1233,18 +1251,31 @@ def cmd_mark(args):
     data = load_vault(vault)
     root = Path(args.repo_dir).resolve()
     secret = base64.b64decode(data["secret"])
-    files = repo_files(root, {Path(__file__).resolve(), vault})
+    inc = sorted({*data.get("include_dirs", []), *(args.include_dir or [])})
+    inc_changed = inc != sorted(data.get("include_dirs", []))
+    data["include_dirs"] = inc
+    files = repo_files(root, {Path(__file__).resolve(), vault}, tuple(inc))
     lic = None if args.no_spdx else (args.license or data.get("license"))
     spdx = {"license": lic, "owner": args.owner or data.get("spdx_owner")} if lic else None
     label = data.get("marker_label", "build-ref")
     marked = sum(1 for p in files if not re.search(rf"\b{data['ptag']}-[0-9a-f]{{8}}\b", read(p)))
     new = [p for p in files if p.relative_to(root).as_posix() not in data["files"]]
     if args.dry_run:
-        print(f"Dry run: {marked} file(s) would be marked, {len(new)} branch-only file(s) added to the vault index.")
+        print(f"Dry run: {marked} file(s) would be marked, {len(new)} new file(s) added to the vault index.")
         return
     for p in files:
         add_marker(p, root, secret, data["ptag"], label, spdx)
-    if new:
+    updated = 0
+    if args.update_existing:
+        # the primary branch keeps the fingerprints of files it shares with the vault current;
+        # entries for files that were deleted stay, since old copies of them are still evidence
+        idx = build_index(root, [p for p in files if p not in new], secret, data["ptag"], data["canaries"])
+        for rel, e in idx.items():
+            o = data["files"][rel]
+            if (o["tok"], o["ast"]) != (e["tok"], e["ast"]):
+                data["files"][rel] = e
+                updated += 1
+    if new or updated or inc_changed:
         data["files"].update(build_index(root, new, secret, data["ptag"], data["canaries"]))
         data["queries"] = build_queries(data)
         if spdx and spdx.get("owner"):
@@ -1252,7 +1283,92 @@ def cmd_mark(args):
         data["refreshed"] = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
         shutil.copy(vault, vault.with_suffix(".md.bak"))
         write_vault(vault, data)
-    print(f"Marked {marked} file(s) in {root.name}; {len(new)} branch-only file(s) added to {vault.name}.")
+    print(f"Marked {marked} file(s) in {root.name}; vault {vault.name}: {len(new)} new file(s), "
+          f"{updated} updated.")
+
+
+GATE_CHECK = r"""
+import json, os, re, subprocess, sys
+cfg = json.loads(os.environ["TRAPR_GATE"])
+inc = [i.strip("/") for i in cfg["include"]]
+skip = set(cfg["skip"])
+def wanted(path):
+    parts = path.split("/")
+    if os.path.splitext(path)[1].lower() not in cfg["ext"]:
+        return False
+    for i in inc:
+        if path.startswith(i + "/"):
+            return not any(x in skip for x in path[len(i) + 1:].split("/")[:-1])
+    return not any(x in skip or (x.startswith(".") and x != ".github") for x in parts[:-1])
+files = [f for f in subprocess.run(["git", "ls-files", "-z"], capture_output=True, text=True,
+                                   check=True).stdout.split("\0") if f and wanted(f)]
+mark = re.compile(r"\b" + cfg["ptag"] + r"-[0-9a-f]{8}\b")
+missing = [f for f in files if os.path.isfile(f) and not mark.search(open(f, encoding="utf-8", errors="replace").read())]
+with open(os.environ.get("GITHUB_OUTPUT", os.devnull), "a") as out:
+    out.write(f"missing={len(missing)}\n")
+print(f"{len(files) - len(missing)}/{len(files)} source files carry a TrapR build reference.")
+for f in missing:
+    print(f"::warning file={f}::no TrapR build reference yet")
+"""
+
+
+def cmd_gate_workflow(args):
+    """Print a GitHub workflow for the PROTECTED repo: a pull-request check that every source file
+    carries a marker. It holds no secret (the project tag is already in every file); missing markers
+    trigger the private sync, which marks the PR branch, and the check passes on the bot's push."""
+    data = load_vault(Path(args.vault).resolve())
+    cfg = {"ptag": data["ptag"], "include": sorted({*data.get("include_dirs", []), *(args.include_dir or [])}),
+           "ext": sorted(COMMENT),
+           "skip": sorted(SKIP_DIRS)}
+    branches = args.branch or ["main"]
+    check = "\n".join("          " + l if l else "" for l in GATE_CHECK.strip("\n").splitlines())
+    print(f"""# TrapR gate: every source file must carry a TrapR build reference before it reaches
+# {", ".join(branches)}. Generated by `trapr gate-workflow`; make "trapr-gate" a required status check.
+#
+# Optional secret TRAPR_DISPATCH_TOKEN: a fine-grained token on {args.vaults_repo} with only
+# "Actions: Read and write". With it, a pull request with unmarked files asks the private sync to mark
+# them right away; without it, the scheduled sync does it. It cannot read the vaults repo's files.
+name: trapr-gate
+on:
+  pull_request:
+    branches: [{", ".join(branches)}]
+  push:
+    branches: [{", ".join(branches)}]
+
+permissions:
+  contents: read
+
+jobs:
+  trapr-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check build references
+        id: check
+        env:
+          TRAPR_GATE: '{json.dumps(cfg, separators=(",", ":"))}'
+        run: |
+          python3 - <<'PY'
+{check}
+          PY
+      - name: Ask the private sync to mark this pull request
+        if: ${{{{ steps.check.outputs.missing != '0' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}}}
+        continue-on-error: true   # a failed request still leaves the scheduled sync; the next step fails the check anyway
+        env:
+          GH_TOKEN: ${{{{ secrets.TRAPR_DISPATCH_TOKEN }}}}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then echo "No TRAPR_DISPATCH_TOKEN; the scheduled sync will mark it."; exit 0; fi
+          ref=$(gh api repos/{args.vaults_repo} --jq .default_branch) || {{ echo "::warning::TRAPR_DISPATCH_TOKEN can't see {args.vaults_repo}. Give it access to that repo with Actions: Read and write."; exit 1; }}
+          gh api -X POST repos/{args.vaults_repo}/actions/workflows/trapr-sync.yml/dispatches \
+            -f ref="$ref" -f "inputs[pr]=${{{{ github.event.pull_request.number }}}}" -f "inputs[repo]=${{{{ github.repository }}}}"
+          echo "Asked {args.vaults_repo} to mark this pull request."
+      - name: Fail until every file is marked
+        if: ${{{{ always() && steps.check.outputs.missing != '0' }}}}
+        run: |
+          echo "::error::${{{{ steps.check.outputs.missing }}}} file(s) have no TrapR build reference yet. TrapR's sync adds them with a comment-only commit; this check re-runs on that push."
+          exit 1
+""")
 
 
 # ============================================================================ scanning
@@ -2011,6 +2127,8 @@ def main():
     p.add_argument("--canaries", type=int, default=3, choices=range(0, 5), metavar="N",
                    help="how many canaries to plant, 0-4, each a different kind (default: 3)")
     p.add_argument("--marker-label", help="comment label for markers (default: chosen per project)")
+    p.add_argument("--include-dir", action="append", metavar="PATH",
+                   help="also protect this hidden or tool folder, e.g. .claude (repeatable; saved in the vault)")
     p.add_argument("--no-markers", action="store_true")
     p.add_argument("--no-spdx", action="store_true")
     p.add_argument("--no-timestamp", action="store_true", help="don't submit the commitment to OpenTimestamps")
@@ -2022,6 +2140,7 @@ def main():
     p.add_argument("--vault", required=True)
     p.add_argument("--repo-dir", default=".")
     p.add_argument("--no-markers", action="store_true", help="don't mark new files")
+    p.add_argument("--include-dir", action="append", metavar="PATH", help="also protect this hidden folder (saved in the vault)")
 
     p = sub.add_parser("mark", help="mark another branch with the same key (vault entries are only added, never changed)")
     p.set_defaults(fn=cmd_mark)
@@ -2030,7 +2149,17 @@ def main():
     p.add_argument("--license", help="SPDX license id (default: the one used at protect)")
     p.add_argument("--owner", help="copyright holder for SPDX headers")
     p.add_argument("--no-spdx", action="store_true")
+    p.add_argument("--include-dir", action="append", metavar="PATH", help="also protect this hidden folder (saved in the vault)")
+    p.add_argument("--update-existing", action="store_true",
+                   help="also refresh fingerprints of files that changed (use on the main branch only)")
     p.add_argument("--dry-run", action="store_true")
+
+    p = sub.add_parser("gate-workflow", help="print a pull-request check for the protected repo (no secrets in it)")
+    p.set_defaults(fn=cmd_gate_workflow)
+    p.add_argument("--vault", required=True)
+    p.add_argument("--branch", action="append", help="branches to guard (repeatable; default: main)")
+    p.add_argument("--vaults-repo", required=True, help="owner/name of your PRIVATE vaults repo")
+    p.add_argument("--include-dir", action="append", metavar="PATH", help="hidden folders the sync also marks")
 
     p = sub.add_parser("verify", help="check a file, folder, git URL, or GitHub file URL")
     p.set_defaults(fn=cmd_verify)

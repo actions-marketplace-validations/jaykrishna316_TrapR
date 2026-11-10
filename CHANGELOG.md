@@ -7,6 +7,19 @@
   that branch are added to the vault index so their markers stay definitive. Existing vault entries are never
   changed. Canaries are left to main; branches pick them up when they merge it.
 - The SPDX copyright owner is now stored in the vault, so `mark` can reuse it.
+- **Hidden folders:** `--include-dir .claude` (on `protect`, `refresh` or `mark`) also protects a hidden or
+  tool folder. It's saved in the vault, so later runs keep including it. `node_modules` and other tool
+  folders inside it stay skipped.
+- **`mark --update-existing`:** on the main branch, also refreshes the fingerprints of files that changed.
+  Entries for deleted files stay, because old copies of them are still evidence.
+- **Marking is now a merge prerequisite.** `trapr gate-workflow` prints a pull-request check for the
+  protected repo: it fails while any source file lacks a build reference, and asks the private sync to mark
+  the pull request's branch. Make it a required status check and nothing reaches main unmarked. The check
+  holds no secret.
+- **Automatic sync:** `examples/vaults-repo/trapr_sync.py` and `trapr-sync.yml` run from your private vaults
+  repo. They mark open pull requests (at once when the gate asks, otherwise every 6 hours), mark new files
+  on the branches you list, keep fingerprints current, and push comment-only commits (or open a pull
+  request when a branch is protected). The key never leaves the private repo.
 
 ## 0.4.1 (2026-11-07)
 
