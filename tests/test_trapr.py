@@ -368,7 +368,8 @@ def main() -> int:
          and data5["files"]["myproj/utils.py"]["tok"] != old_fp and "myproj/branch_only.py" in data5["files"]),
         ("gate-workflow: a pull-request check that carries the tag but never the key",
          "name: trapr-gate" in gate and data["ptag"] in gate and data["secret"] not in gate
-         and "secrets.TRAPR_DISPATCH_TOKEN" in gate and '".claude"' in gate),
+         and "secrets.TRAPR_DISPATCH_TOKEN" in gate and '".claude"' in gate
+         and "github.event_name == 'push'" in gate),
         ("refresh: same key, new file marked", data2["ptag"] == data["ptag"]
          and "myproj/new_module.py" in data2["files"] and data2["files"]["myproj/new_module.py"]["marked"]),
     ]

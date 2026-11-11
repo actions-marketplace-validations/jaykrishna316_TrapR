@@ -1360,9 +1360,18 @@ jobs:
         run: |
           if [ -z "$GH_TOKEN" ]; then echo "No TRAPR_DISPATCH_TOKEN; the scheduled sync will mark it."; exit 0; fi
           ref=$(gh api repos/{args.vaults_repo} --jq .default_branch) || {{ echo "::warning::TRAPR_DISPATCH_TOKEN can't see {args.vaults_repo}. Give it access to that repo with Actions: Read and write."; exit 1; }}
-          gh api -X POST repos/{args.vaults_repo}/actions/workflows/trapr-sync.yml/dispatches \
-            -f ref="$ref" -f "inputs[pr]=${{{{ github.event.pull_request.number }}}}" -f "inputs[repo]=${{{{ github.repository }}}}"
+          gh api -X POST repos/{args.vaults_repo}/actions/workflows/trapr-sync.yml/dispatches -f ref="$ref" -f "inputs[pr]=${{{{ github.event.pull_request.number }}}}" -f "inputs[repo]=${{{{ github.repository }}}}"
           echo "Asked {args.vaults_repo} to mark this pull request."
+      - name: After a push, ask the private sync to mark new files and update the vault
+        if: ${{{{ github.event_name == 'push' && !startsWith(github.event.head_commit.message, 'Add TrapR build references') }}}}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{{{ secrets.TRAPR_DISPATCH_TOKEN }}}}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then echo "No TRAPR_DISPATCH_TOKEN; the scheduled sync will do it."; exit 0; fi
+          ref=$(gh api repos/{args.vaults_repo} --jq .default_branch) || {{ echo "::warning::TRAPR_DISPATCH_TOKEN can't see {args.vaults_repo}. Give it access to that repo with Actions: Read and write."; exit 1; }}
+          gh api -X POST repos/{args.vaults_repo}/actions/workflows/trapr-sync.yml/dispatches -f ref="$ref" -f "inputs[repo]=${{{{ github.repository }}}}"
+          echo "Asked {args.vaults_repo} to sync this repo."
       - name: Fail until every file is marked
         if: ${{{{ always() && steps.check.outputs.missing != '0' }}}}
         run: |
