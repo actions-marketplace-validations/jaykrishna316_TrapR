@@ -26,6 +26,7 @@ jobs:
         run: |
           python tests/test_trapr.py
           python tests/test_similarity.py
+          python tests/test_constants.py
       - name: Package installs and runs
         run: |
           pip install .

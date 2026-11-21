@@ -50,7 +50,7 @@ import urllib.request
 from collections import Counter
 from pathlib import Path
 
-VERSION = "0.5.2"
+VERSION = "0.5.3"
 
 try:
     from tree_sitter_language_pack import get_parser as _ts_parser
@@ -1410,14 +1410,22 @@ def scan_file(text: str, ext: str, data: dict, min_score: float = 0.35) -> dict 
         if row["score"] >= min_score:
             struct.append(row)
     struct.sort(key=lambda r: -r["score"])
-    consts = {n: h for n, c in data["canaries"].items() if (h := constant_hits(text, c))}
+    # Canary constants only count in source code: data files (CSV, logs, ID lists, dumps) are full of
+    # numbers and match a single constant by chance.
+    consts = ({n: h for n, c in data["canaries"].items() if (h := constant_hits(text, c))}
+              if ext in COMMENT else {})
     behavior = []
     lang = "py" if ext == ".py" else "js" if ext in JS_EXT else None
     # every canary kind uses arithmetic; files without any of these can't contain one
     if data["canaries"] and lang and any(t in text for t in ("^", "%", "&", "imul", "xor", "mod")):
         behavior = canary_behavior(*harness(text, ext), lang, data["canaries"])
-    if not (markers_known or markers_unknown or struct or consts or behavior):
-        return None
+    if not (markers_known or markers_unknown or struct or behavior):
+        # Only canary constants matched. A copy keeps a canary's math, so all its constants travel together;
+        # one short constant on its own is a coincidence. Keep a lone constant only if it is 9+ digits.
+        consts = {n: h for n, h in consts.items()
+                  if len(h) >= 2 or canary_consts(data["canaries"][n])[h[0]] >= 10**8}
+        if not consts:
+            return None
     full = any(b["matched"] == b["total"] for b in behavior)
     top = struct[0]["score"] if struct else 0
     if markers_known or full:

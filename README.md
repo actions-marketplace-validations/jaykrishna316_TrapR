@@ -29,7 +29,7 @@ The agent follows [`AGENTS.md`](AGENTS.md): it confirms the license, runs a dry 
 
 **2. One file, no install**
 ```bash
-curl -fsSLo ~/trapr.py https://raw.githubusercontent.com/jaykrishna316/TrapR/v0.5.2/trapr.py
+curl -fsSLo ~/trapr.py https://raw.githubusercontent.com/jaykrishna316/TrapR/v0.5.3/trapr.py
 cd ~/code/my-project
 python3 ~/trapr.py protect --license MIT --owner "Your Name"
 git diff --stat                     # review, then commit and push
@@ -86,7 +86,7 @@ Pick sources with `--sources code,forks,pypi,npm`.
 [`examples/vaults-repo`](examples/vaults-repo/.github/workflows/trapr-hunt.yml):
 
 ```yaml
-- uses: jaykrishna316/TrapR@v0.5.2
+- uses: jaykrishna316/TrapR@v0.5.3
   with:
     vaults: "vaults/*.trapr-vault.md"
     search-token: ${{ secrets.TRAPR_SEARCH_TOKEN }}   # fine-grained PAT, public read
@@ -177,13 +177,14 @@ Retested on 2026-11-08 with v0.4.1, on fresh clones of Neo (`main`, 283 files pr
 | **Timestamp, live:** Neo's commitment submitted to OpenTimestamps | Accepted by all 4 public calendars |
 | **Merge gate, live** on a throwaway GitHub repo: `main` requires a green `trapr-gate`, then a pull request adds an unmarked file | The check failed and named the file; the private sync marked the branch with a 3-line comment-only commit; the check passed. **34 seconds, nobody touched anything.** The key never left the private vaults repo |
 
-Test suites: `python3 tests/test_trapr.py` (50 checks) and `python3 tests/test_similarity.py` (cross-language). The main suite covers mocked GitHub search and forks, malicious archives,
+Test suites: `python3 tests/test_trapr.py` (50 checks), `python3 tests/test_similarity.py` (cross-language) and `python3 tests/test_constants.py` (canary-constant false positives). The main suite covers mocked GitHub search and forks, malicious archives,
 three model-API wire formats, a timestamp proof parsed by the official OpenTimestamps library, and all 1,152 canary
 kind × style combinations. CI runs it on Python 3.10–3.14, with and without tree-sitter, and passes on all 10 jobs.
 
-**Tested live:** GitHub code search finds Neo's and Braxis's markers in their own repos and nowhere else, and the
-merge gate marks new files on push. **Not yet tested live:** fork crawling inside `hunt` against a real copy, and
-probing cloud models.
+**Tested live:** a full `hunt` from the GitHub Action across four projects (code search, fork crawl, PyPI, npm)
+found the test fork that stripped the LICENSE and markers: 🔴 2 definitive by canary, 🟠 1 strong. It also surfaced
+31 coincidental single-constant matches in unrelated data files, which led to the v0.5.3 fix that clears all of
+them. The merge gate marks new files on push. **Not yet tested live:** probing cloud models.
 
 ## How verification stays safe
 
@@ -234,8 +235,7 @@ See [SECURITY.md](SECURITY.md) for the full threat model.
 - **Lead queries** (distinctive strings and identifiers) also match legitimate users of your project. They are leads, not evidence.
 - **Model probes only catch memorization or live retrieval.** A model trained on your repo but unable to recite the
   canary passes. That's the expected outcome for most models and one repo; nothing today can prove that case.
-- **`hunt`'s fork crawl has only run against mocked GitHub APIs** built from the official formats (code search has
-  run live); model probes have run live against Ollama, but not yet against cloud APIs. Please report problems.
+- **Model probes have run live against Ollama, but not yet against cloud APIs.** Please report problems.
 - **`similarity` misses short ports** that share only one or two distinctive literals. It's precision-first on purpose.
 - **The vault is large** (about 260 KB for Braxis and 790 KB for Neo) because it carries fingerprints. Agents are told to read only the first few hundred lines.
 - **Lose the vault and you lose the proof.** Back it up. With `--force`, `protect` makes a new key and the old markers become unprovable.

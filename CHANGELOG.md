@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.3 (2026-11-21)
+
+- **Fewer false positives from canary constants.** The first live hunt across four projects flagged 31 unrelated
+  files (CSV captures, ID lists, decompiled C++) because one 7-digit canary constant appeared in them by chance.
+  Constants now count only in source code, and a lone constant counts only if it has 9 or more digits; a real copy
+  keeps the canary's math, so its constants travel together. All 31 now clear, and the real test copy is still
+  definitive. New regression test: `tests/test_constants.py`.
+- **First fully live hunt.** GitHub code search, the fork crawl, PyPI and npm ran live from the GitHub Action across
+  Neo, Braxis, TrapR and a demo repo. The fork crawl found the test fork that removed the LICENSE and markers.
+
 ## 0.5.2 (2026-11-21)
 
 - **Fix:** when a hunt found evidence, the Action's "Open an issue" step could fail with "Body is too long", because

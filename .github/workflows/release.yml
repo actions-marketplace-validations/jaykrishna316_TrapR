@@ -21,7 +21,7 @@ jobs:
           v=$(python trapr.py --version)
           [ "v$v" = "${GITHUB_REF_NAME}" ] || { echo "::error::trapr.py says $v but tag is ${GITHUB_REF_NAME}"; exit 1; }
       - name: Test
-        run: python tests/test_trapr.py && python tests/test_similarity.py
+        run: python tests/test_trapr.py && python tests/test_similarity.py && python tests/test_constants.py
       - name: Build
         run: |
           pip install build
