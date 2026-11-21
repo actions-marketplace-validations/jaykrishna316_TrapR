@@ -11,12 +11,13 @@
 
 [![ci](https://github.com/jaykrishna316/TrapR/actions/workflows/ci.yml/badge.svg)](https://github.com/jaykrishna316/TrapR/actions/workflows/ci.yml)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue) ![deps](https://img.shields.io/badge/dependencies-zero-brightgreen) ![license](https://img.shields.io/badge/license-MIT-green)
+[![GitHub Marketplace](https://img.shields.io/badge/Marketplace-TrapR%20hunt-2ea44f?logo=github)](https://github.com/marketplace/actions/trapr-hunt)
 
 Mapmakers used to draw fake "trap streets", roads that don't exist, to prove when someone copied their map. **TrapR** does the same for code.
 
+> **New:** the weekly hunt is on the **[GitHub Marketplace](https://github.com/marketplace/actions/trapr-hunt)**.
 > **Coming soon:** TrapR as an **MCP server**, so Claude Code, Cursor and other agents can run `verify`, `similarity`
-> and `hunt` as tools, and the TrapR gate and hunt **Actions on the GitHub Marketplace** for one-click setup.
-> ⭐ Star or watch the repo to hear when they land.
+> and `hunt` as tools. ⭐ Star or watch the repo to hear when it lands.
 
 ## Protect your repo in one minute
 
@@ -82,7 +83,7 @@ removed your LICENSE or stripped markers), and **PyPI and npm** packages with si
 safely, never installed. Code search and forks need `GITHUB_TOKEN` or a logged-in `gh`; registries need nothing.
 Pick sources with `--sources code,forks,pypi,npm`.
 
-**Option C: every week, automatically, with an email.** Keep your vaults in one **private** repo and add the workflow from
+**Option C: every week, automatically, with an email.** Use the **[TrapR hunt Action from the GitHub Marketplace](https://github.com/marketplace/actions/trapr-hunt)**. Keep your vaults in one **private** repo and add the workflow from
 [`examples/vaults-repo`](examples/vaults-repo/.github/workflows/trapr-hunt.yml):
 
 ```yaml
@@ -258,7 +259,7 @@ What TrapR adds is the **maintainer-side workflow**: one command to plant everyt
 - More canary types (string normalizers, checksums) and TypeScript behavior verification
 - A cross-project vault index for one-command hunts across all your repos
 - **Coming soon:** an MCP server, so AI agents can run `verify`, `similarity` and `hunt` as tools
-- **Coming soon:** the gate and hunt Actions on the GitHub Marketplace
+- The merge gate as its own Marketplace Action (the hunt Action is [already listed](https://github.com/marketplace/actions/trapr-hunt))
 - Function-level similarity, to catch short ports the current rules miss
 
 ## Contributing
