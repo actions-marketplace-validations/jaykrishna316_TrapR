@@ -29,7 +29,7 @@ The agent follows [`AGENTS.md`](AGENTS.md): it confirms the license, runs a dry 
 
 **2. One file, no install**
 ```bash
-curl -fsSLo ~/trapr.py https://raw.githubusercontent.com/jaykrishna316/TrapR/v0.5.1/trapr.py
+curl -fsSLo ~/trapr.py https://raw.githubusercontent.com/jaykrishna316/TrapR/v0.5.2/trapr.py
 cd ~/code/my-project
 python3 ~/trapr.py protect --license MIT --owner "Your Name"
 git diff --stat                     # review, then commit and push
@@ -86,7 +86,7 @@ Pick sources with `--sources code,forks,pypi,npm`.
 [`examples/vaults-repo`](examples/vaults-repo/.github/workflows/trapr-hunt.yml):
 
 ```yaml
-- uses: jaykrishna316/TrapR@v0.5.1
+- uses: jaykrishna316/TrapR@v0.5.2
   with:
     vaults: "vaults/*.trapr-vault.md"
     search-token: ${{ secrets.TRAPR_SEARCH_TOKEN }}   # fine-grained PAT, public read

@@ -26,8 +26,8 @@ printed in full, or uploaded anywhere.
 ```bash
 TS_DIR="${HOME}/.trapr" && mkdir -p "$TS_DIR"
 curl -fsSL -o "$TS_DIR/trapr.py" \
-  https://raw.githubusercontent.com/jaykrishna316/TrapR/v0.5.1/trapr.py
-python3 "$TS_DIR/trapr.py" --version        # expect 0.5.1
+  https://raw.githubusercontent.com/jaykrishna316/TrapR/v0.5.2/trapr.py
+python3 "$TS_DIR/trapr.py" --version        # expect 0.5.2
 ```
 
 If the release page lists a SHA-256 for `trapr.py`, verify it (`shasum -a 256` on macOS,

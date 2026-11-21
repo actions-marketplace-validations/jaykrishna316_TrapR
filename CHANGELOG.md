@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.2 (2026-11-21)
+
+- **Fix:** when a hunt found evidence, the Action's "Open an issue" step could fail with "Body is too long", because
+  GitHub caps an issue at 65,536 characters. The issue now leads with a table per project, keeps each project's
+  report short, and links to the run's `trapr-reports` artifact for the full reports.
+
 ## 0.5.1 (2026-11-21)
 
 - **Scheduled hunts with a weekly email:** the GitHub Action now writes one report per project and comments on a

@@ -111,10 +111,37 @@ runs:
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
+        GH_REPO: ${{ github.repository }}
         D: ${{ steps.hunt.outputs.definitive }}
         S: ${{ steps.hunt.outputs.strong }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       run: |
-        cat trapr-reports/*.md > body.md
+        # GitHub caps an issue body at 65,536 characters: lead with the table, keep each project's
+        # report short, and point to the run's artifact for the full reports.
+        {
+          echo "**$D definitive, $S strong** finding(s)."
+          echo
+          echo "| Project | Definitive | Strong | Status |"
+          echo "|---|---|---|---|"
+          awk -F'\t' '{printf "| %s | %s | %s | %s |\n", $1, $2, $3, $4}' trapr-reports/summary.tsv
+          echo
+          echo "Full reports: download the **trapr-reports** artifact from $RUN_URL"
+          echo
+          for r in trapr-reports/*.md; do
+            [ -f "$r" ] || continue
+            echo "<details><summary>$(basename "$r" .md)</summary>"
+            echo
+            sed -n '1,120p' "$r"
+            echo
+            echo "</details>"
+          done
+        } > body-full.md
+        if [ "$(wc -c < body-full.md)" -gt 60000 ]; then
+          head -c 60000 body-full.md > body.md
+          printf '\n\n</details>\n\n…truncated. Full reports: the **trapr-reports** artifact at %s\n' "$RUN_URL" >> body.md
+        else
+          mv body-full.md body.md
+        fi
         gh issue create --title "TrapR: $D definitive, $S strong finding(s) ($(date +%F))" --body-file body.md
 
     - name: Post the run report

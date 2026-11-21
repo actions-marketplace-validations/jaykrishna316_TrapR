@@ -50,7 +50,7 @@ import urllib.request
 from collections import Counter
 from pathlib import Path
 
-VERSION = "0.5.1"
+VERSION = "0.5.2"
 
 try:
     from tree_sitter_language_pack import get_parser as _ts_parser
