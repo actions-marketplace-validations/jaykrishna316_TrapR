@@ -25,7 +25,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
-      - uses: jaykrishna316/TrapR@v0.4.1
+      - uses: jaykrishna316/TrapR@v0.5.0
         with:
           vaults: "vaults/*.trapr-vault.md"
           search-token: ${{ secrets.TRAPR_SEARCH_TOKEN }}

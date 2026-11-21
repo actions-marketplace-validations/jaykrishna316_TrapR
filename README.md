@@ -25,7 +25,7 @@ The agent follows [`AGENTS.md`](AGENTS.md): it confirms the license, runs a dry 
 
 **2. One file, no install**
 ```bash
-curl -fsSLo ~/trapr.py https://raw.githubusercontent.com/jaykrishna316/TrapR/v0.4.1/trapr.py
+curl -fsSLo ~/trapr.py https://raw.githubusercontent.com/jaykrishna316/TrapR/v0.5.0/trapr.py
 cd ~/code/my-project
 python3 ~/trapr.py protect --license MIT --owner "Your Name"
 git diff --stat                     # review, then commit and push
@@ -33,7 +33,7 @@ git diff --stat                     # review, then commit and push
 
 **3. As a command**
 ```bash
-pipx install trapr             # or: uvx trapr protect …
+pipx install trapr             # or: uvx trapr protect …  (on PyPI from v0.5.0)
 trapr protect --license MIT --owner "Your Name"
 ```
 
@@ -67,7 +67,12 @@ trapr hunt   --vault neo.trapr-vault.md            # GitHub code search + forks 
 trapr verify --vault neo.trapr-vault.md <target>   # a file, folder, git URL, or GitHub file URL
 trapr refresh --vault neo.trapr-vault.md --repo-dir ~/code/neo   # after big changes (same key)
 trapr mark    --vault neo.trapr-vault.md --repo-dir ~/code/neo   # another branch, same key
+trapr similarity --repo-dir ~/code/neo --target <folder|git URL>  # lead finder, works across languages
 ```
+`similarity` compares your code with a suspect even after a port to another language: keywords map to neutral
+tokens and distinctive string and number literals are compared separately. It returns a lead for review, never
+proof. Calibrated on 36 unrelated repo pairs with 0 false leads; it misses short ports that share only one or two
+distinctive literals.
 `hunt` searches four places: GitHub code search, your **fork network** (forks aren't in code search; it flags forks that
 removed your LICENSE or stripped markers), and **PyPI and npm** packages with similar names, downloaded and scanned
 safely, never installed. Code search and forks need `GITHUB_TOKEN` or a logged-in `gh`; registries need nothing.
@@ -77,7 +82,7 @@ Pick sources with `--sources code,forks,pypi,npm`.
 [`examples/vaults-repo`](examples/vaults-repo/.github/workflows/trapr-hunt.yml):
 
 ```yaml
-- uses: jaykrishna316/TrapR@v0.4.1
+- uses: jaykrishna316/TrapR@v0.5.0
   with:
     vaults: "vaults/*.trapr-vault.md"
     search-token: ${{ secrets.TRAPR_SEARCH_TOKEN }}   # fine-grained PAT, public read
@@ -157,12 +162,13 @@ Retested on 2026-11-08 with v0.4.1, on fresh clones of Neo (`main`, 283 files pr
 | **Timestamp, live:** Neo's commitment submitted to OpenTimestamps | Accepted by all 4 public calendars |
 | **Merge gate, live** on a throwaway GitHub repo: `main` requires a green `trapr-gate`, then a pull request adds an unmarked file | The check failed and named the file; the private sync marked the branch with a 3-line comment-only commit; the check passed. **34 seconds, nobody touched anything.** The key never left the private vaults repo |
 
-Test suite: `python3 tests/test_trapr.py`: 43 checks, including mocked GitHub search and forks, malicious archives,
+Test suites: `python3 tests/test_trapr.py` (50 checks) and `python3 tests/test_similarity.py` (cross-language). The main suite covers mocked GitHub search and forks, malicious archives,
 three model-API wire formats, a timestamp proof parsed by the official OpenTimestamps library, and all 1,152 canary
 kind × style combinations. CI runs it on Python 3.10–3.14, with and without tree-sitter, and passes on all 10 jobs.
 
-**Not yet tested live:** GitHub code search and fork crawling inside `hunt` (tested against mocked GitHub APIs only),
-and probing cloud models.
+**Tested live:** GitHub code search finds Neo's and Braxis's markers in their own repos and nowhere else, and the
+merge gate marks new files on push. **Not yet tested live:** fork crawling inside `hunt` against a real copy, and
+probing cloud models.
 
 ## How verification stays safe
 

@@ -23,7 +23,9 @@ jobs:
         if: matrix.ast == 'tree-sitter'
         run: pip install ".[ast]"
       - name: Tests
-        run: python tests/test_trapr.py
+        run: |
+          python tests/test_trapr.py
+          python tests/test_similarity.py
       - name: Package installs and runs
         run: |
           pip install .

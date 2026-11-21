@@ -49,7 +49,7 @@ import urllib.request
 from collections import Counter
 from pathlib import Path
 
-VERSION = "0.4.2"
+VERSION = "0.5.0"
 
 try:
     from tree_sitter_language_pack import get_parser as _ts_parser
@@ -1229,9 +1229,11 @@ def cmd_refresh(args):
     data["include_dirs"] = sorted({*data.get("include_dirs", []), *(args.include_dir or [])})
     files = repo_files(root, {Path(__file__).resolve(), vault}, tuple(data["include_dirs"]))
     added = 0
+    lic = data.get("license")
+    spdx = {"license": lic, "owner": data.get("spdx_owner")} if lic else None
     if not args.no_markers:
         for p in files:
-            added += add_marker(p, root, secret, data["ptag"], data.get("marker_label", "build-ref"), None)
+            added += add_marker(p, root, secret, data["ptag"], data.get("marker_label", "build-ref"), spdx)
     data["files"] = build_index(root, files, secret, data["ptag"], data["canaries"])
     data["distinctive"] = distinctive({p.relative_to(root).as_posix(): read(p) for p in files})
     data["own_packages"] = own_package_names(root)

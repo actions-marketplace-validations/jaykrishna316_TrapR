@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.0 (2026-11-21)
 
 - **New `similarity` command:** compares your code with any folder, git URL or GitHub file, including after a port
   to another language. Keywords map to language-neutral tokens, type and modifier words are ignored, and distinctive
@@ -9,6 +9,7 @@
 - **Calibration:** 22 unrelated popular repos (incl. Python, JavaScript and Java rate limiters and a circuit breaker)
   and 14 held-out unrelated repos gave 0 false leads. The highest unrelated containment was 0.21. A real copy (a fork
   with markers and LICENSE removed) scored 1.00 containment and was flagged.
+- **Fix:** `refresh` now gives newly marked files the same SPDX header lines as `protect` and `mark`.
 - **Known recall limit:** a clean port of a short module that shares only one or two distinctive literals is not
   reported as a lead. The rules are precision-first on purpose.
 
