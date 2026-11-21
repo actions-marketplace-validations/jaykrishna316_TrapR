@@ -8,11 +8,15 @@
 #
 # Secret needed: TRAPR_SEARCH_TOKEN, a fine-grained personal access token
 # (public repositories, read-only is enough). Code search requires a user token.
+# Every *.trapr-vault.md you add to vaults/ is hunted automatically, with one report per project.
+# After each run TrapR comments on a "TrapR weekly hunt" issue in this repo (all clear or not), and
+# opens a separate issue when it finds evidence. GitHub emails both to anyone watching the repo.
+# No token is ever written to logs, reports or issues; the repo's own GITHUB_TOKEN posts the issues.
 
 name: trapr hunt
 on:
   schedule:
-    - cron: "17 13 * * 1"   # Mondays 13:17 UTC
+    - cron: "17 14 * * 0"   # Sundays 14:17 UTC; change to suit
   workflow_dispatch:
 
 permissions:
@@ -25,7 +29,8 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
-      - uses: jaykrishna316/TrapR@v0.5.0
+      - uses: jaykrishna316/TrapR@v0.5.1
         with:
           vaults: "vaults/*.trapr-vault.md"
           search-token: ${{ secrets.TRAPR_SEARCH_TOKEN }}
+          # report-issue: "TrapR weekly hunt"   # default; set to "" for no weekly email

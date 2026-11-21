@@ -29,7 +29,7 @@ The agent follows [`AGENTS.md`](AGENTS.md): it confirms the license, runs a dry 
 
 **2. One file, no install**
 ```bash
-curl -fsSLo ~/trapr.py https://raw.githubusercontent.com/jaykrishna316/TrapR/v0.5.0/trapr.py
+curl -fsSLo ~/trapr.py https://raw.githubusercontent.com/jaykrishna316/TrapR/v0.5.1/trapr.py
 cd ~/code/my-project
 python3 ~/trapr.py protect --license MIT --owner "Your Name"
 git diff --stat                     # review, then commit and push
@@ -82,18 +82,24 @@ removed your LICENSE or stripped markers), and **PyPI and npm** packages with si
 safely, never installed. Code search and forks need `GITHUB_TOKEN` or a logged-in `gh`; registries need nothing.
 Pick sources with `--sources code,forks,pypi,npm`.
 
-**Option C: weekly, automatically.** Keep your vaults in one **private** repo and add the workflow from
+**Option C: every week, automatically, with an email.** Keep your vaults in one **private** repo and add the workflow from
 [`examples/vaults-repo`](examples/vaults-repo/.github/workflows/trapr-hunt.yml):
 
 ```yaml
-- uses: jaykrishna316/TrapR@v0.5.0
+- uses: jaykrishna316/TrapR@v0.5.1
   with:
     vaults: "vaults/*.trapr-vault.md"
     search-token: ${{ secrets.TRAPR_SEARCH_TOKEN }}   # fine-grained PAT, public read
 ```
 
-It hunts with every vault, posts a summary, uploads the reports, and opens an issue when there's
-definitive or strong evidence. It refuses to run in a public repository.
+On your schedule (the example runs every Sunday) it hunts with **every vault in the repo**, so a new project is
+covered as soon as you add its vault. It writes **one report per project**, uploads them, and comments on a single
+**"TrapR weekly hunt"** issue with a row per project, all clear or not. When there's definitive or strong evidence it
+also opens a separate issue. GitHub emails both to you, so a quiet week still lands in your inbox.
+
+Your tokens stay put: the search token goes only into API request headers, never into logs, reports or issues,
+and the issues are posted with the repository's own `GITHUB_TOKEN`. The action refuses to run in a public
+repository, because vaults hold secret keys.
 
 ## Did an AI model learn your code?
 

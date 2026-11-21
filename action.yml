@@ -21,6 +21,9 @@ inputs:
   open-issue:
     description: "Open an issue in this (private) repo when definitive or strong evidence is found."
     default: "true"
+  report-issue:
+    description: "Title of one issue that gets a comment after every run, all clear or not, with a row per project. GitHub emails each comment to people watching the repo. Set to empty to turn off."
+    default: "TrapR weekly hunt"
   python-version:
     description: "Python version to use."
     default: "3.12"
@@ -69,6 +72,7 @@ runs:
         files=( $VAULTS )
         if [ ${#files[@]} -eq 0 ]; then echo "::error::No vaults match '$VAULTS'"; exit 1; fi
         d=0; s=0
+        : > trapr-reports/summary.tsv
         for v in "${files[@]}"; do
           name=$(basename "$v" .trapr-vault.md)
           echo "::group::Hunting with $name"
@@ -76,8 +80,12 @@ runs:
           echo "::endgroup::"
           if [ -f "trapr-reports/$name.md" ]; then
             line=$(grep -m1 '^- Findings:' "trapr-reports/$name.md" || true)
-            d=$(( d + $(echo "$line" | sed -nE 's/.*: ([0-9]+) definitive.*/\1/p' | grep . || echo 0) ))
-            s=$(( s + $(echo "$line" | sed -nE 's/.* ([0-9]+) strong.*/\1/p' | grep . || echo 0) ))
+            vd=$(echo "$line" | sed -nE 's/.*: ([0-9]+) definitive.*/\1/p' | grep . || echo 0)
+            vs=$(echo "$line" | sed -nE 's/.* ([0-9]+) strong.*/\1/p' | grep . || echo 0)
+            d=$(( d + vd )); s=$(( s + vs ))
+            printf '%s\t%s\t%s\tok\n' "$name" "$vd" "$vs" >> trapr-reports/summary.tsv
+          else
+            printf '%s\t-\t-\tno report\n' "$name" >> trapr-reports/summary.tsv
           fi
         done
         echo "definitive=$d" >> "$GITHUB_OUTPUT"
@@ -85,6 +93,10 @@ runs:
         {
           echo "## trapr hunt"
           echo "- Definitive: **$d** · Strong: **$s**"
+          echo
+          echo "| Project | Definitive | Strong | Status |"
+          echo "|---|---|---|---|"
+          awk -F'\t' '{printf "| %s | %s | %s | %s |\n", $1, $2, $3, $4}' trapr-reports/summary.tsv
           echo
           for r in trapr-reports/*.md; do echo "### $(basename "$r" .md)"; sed -n '1,40p' "$r"; done
         } >> "$GITHUB_STEP_SUMMARY"
@@ -104,3 +116,44 @@ runs:
       run: |
         cat trapr-reports/*.md > body.md
         gh issue create --title "TrapR: $D definitive, $S strong finding(s) ($(date +%F))" --body-file body.md
+
+    - name: Post the run report
+      if: ${{ always() && inputs.report-issue != '' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        GH_REPO: ${{ github.repository }}
+        TITLE: ${{ inputs.report-issue }}
+        D: ${{ steps.hunt.outputs.definitive }}
+        S: ${{ steps.hunt.outputs.strong }}
+        OUTCOME: ${{ steps.hunt.outcome }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      run: |
+        n=$(gh issue list --state open --limit 200 --json number,title --jq '.[] | select(.title==env.TITLE) | .number' | head -1)
+        if [ -z "$n" ]; then
+          n=$(gh issue create --title "$TITLE" --body "TrapR posts the result of every hunt here, one row per project. Watch this repository to get each one by email." | grep -oE '[0-9]+$')
+        fi
+        if [ "$OUTCOME" != "success" ]; then verdict="⚠️ The hunt didn't finish ($OUTCOME). Check the run."
+        elif [ "${D:-0}" = "0" ] && [ "${S:-0}" = "0" ]; then verdict="✅ All clear: no copies found."
+        else verdict="🚨 ${D:-0} definitive and ${S:-0} strong finding(s). A separate issue has the details."; fi
+        {
+          echo "$verdict"
+          echo
+          echo "| Project | Definitive | Strong | Status |"
+          echo "|---|---|---|---|"
+          if [ -s trapr-reports/summary.tsv ]; then
+            awk -F'\t' '{printf "| %s | %s | %s | %s |\n", $1, $2, $3, $4}' trapr-reports/summary.tsv
+          fi
+          echo
+          for r in trapr-reports/*.md; do
+            [ -f "$r" ] || continue
+            echo "<details><summary>$(basename "$r" .md) report</summary>"
+            echo
+            sed -n '1,60p' "$r"
+            echo
+            echo "</details>"
+          done
+          echo
+          echo "Run, logs and full reports: $RUN_URL"
+        } | head -c 60000 > trapr-comment.md
+        gh issue comment "$n" --body-file trapr-comment.md

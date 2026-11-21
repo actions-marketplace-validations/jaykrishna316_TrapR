@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.1 (2026-11-21)
+
+- **Scheduled hunts with a weekly email:** the GitHub Action now writes one report per project and comments on a
+  single "TrapR weekly hunt" issue after every run, with a row per project, all clear or not. GitHub emails each
+  comment to watchers. New input `report-issue` (default "TrapR weekly hunt"; empty turns it off).
+- Every vault in the repo is hunted automatically, so new projects are covered as soon as their vault is added.
+- The example workflow now runs every Sunday.
+
 ## 0.5.0 (2026-11-21)
 
 - **New `similarity` command:** compares your code with any folder, git URL or GitHub file, including after a port
