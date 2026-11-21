@@ -14,6 +14,10 @@
 
 Mapmakers used to draw fake "trap streets", roads that don't exist, to prove when someone copied their map. **TrapR** does the same for code.
 
+> **Coming soon:** TrapR as an **MCP server**, so Claude Code, Cursor and other agents can run `verify`, `similarity`
+> and `hunt` as tools, and the TrapR gate and hunt **Actions on the GitHub Marketplace** for one-click setup.
+> ⭐ Star or watch the repo to hear when they land.
+
 ## Protect your repo in one minute
 
 Pick whichever way suits you. The tool always runs from **outside** your repo, so nothing of it stays behind.
@@ -33,11 +37,11 @@ git diff --stat                     # review, then commit and push
 
 **3. As a command**
 ```bash
-pipx install trapr             # or: uvx trapr protect …  (on PyPI from v0.5.0)
+pip install git+https://github.com/jaykrishna316/TrapR      # or: pipx install git+https://github.com/jaykrishna316/TrapR
 trapr protect --license MIT --owner "Your Name"
 ```
 
-Add `pip install "trapr[ast]"` (tree-sitter) for AST fingerprints in non-Python repos.
+Add `pip install tree-sitter tree-sitter-language-pack` for AST fingerprints in non-Python repos.
 
 One command does everything:
 
@@ -112,8 +116,10 @@ reveals nothing, so you can publish it. A few hours later, `ots upgrade` and `ot
 `pip install opentimestamps-client`) prove the date to anyone. `trapr timestamp --vault … --swh` re-stamps and asks
 [Software Heritage](https://archive.softwareheritage.org) to archive your public repo as an independent witness.
 
-**Option D: make marking a merge prerequisite.** Every new file should carry a build reference before it
-reaches main. Two pieces, and your public repo never holds the key:
+## Keep it current: the merge gate
+
+Every new file should carry a build reference before it reaches main. Two pieces, and your public repo never
+holds the key:
 
 1. In the protected repo, add the check `trapr gate-workflow` prints and make **trapr-gate** a required
    status check. It fails while any source file lacks a build reference.
@@ -127,6 +133,9 @@ trapr gate-workflow --vault neo.trapr-vault.md --vaults-repo you/trapr-vaults --
 ```
 Pull requests from forks can't be marked by the bot (it can't push to someone else's fork): mark those
 locally with `trapr mark` before merging.
+
+**TrapR protects itself.** The `# build-id: 8113f5bb-…` line at the top of `trapr.py` is TrapR's own marker, and this
+repo runs the same gate. It's a comment: copying TrapR under the MIT license is fine, just keep the attribution.
 
 ## Five layers of evidence
 
@@ -219,8 +228,9 @@ See [SECURITY.md](SECURITY.md) for the full threat model.
 - **Lead queries** (distinctive strings and identifiers) also match legitimate users of your project. They are leads, not evidence.
 - **Model probes only catch memorization or live retrieval.** A model trained on your repo but unable to recite the
   canary passes. That's the expected outcome for most models and one repo; nothing today can prove that case.
-- **`hunt`'s GitHub code search and fork crawl have only run against mocked GitHub APIs** built from the official
-  formats; model probes have run live against Ollama, but not yet against cloud APIs. Please report problems.
+- **`hunt`'s fork crawl has only run against mocked GitHub APIs** built from the official formats (code search has
+  run live); model probes have run live against Ollama, but not yet against cloud APIs. Please report problems.
+- **`similarity` misses short ports** that share only one or two distinctive literals. It's precision-first on purpose.
 - **The vault is large** (about 260 KB for Braxis and 790 KB for Neo) because it carries fingerprints. Agents are told to read only the first few hundred lines.
 - **Lose the vault and you lose the proof.** Back it up. With `--force`, `protect` makes a new key and the old markers become unprovable.
 - **MIT/Apache permit copying.** You're detecting missing attribution. This is evidence gathering, not legal advice.
@@ -241,6 +251,9 @@ What TrapR adds is the **maintainer-side workflow**: one command to plant everyt
 - crates.io, Go modules and Maven scanning
 - More canary types (string normalizers, checksums) and TypeScript behavior verification
 - A cross-project vault index for one-command hunts across all your repos
+- **Coming soon:** an MCP server, so AI agents can run `verify`, `similarity` and `hunt` as tools
+- **Coming soon:** the gate and hunt Actions on the GitHub Marketplace
+- Function-level similarity, to catch short ports the current rules miss
 
 ## Contributing
 

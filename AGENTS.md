@@ -26,13 +26,12 @@ printed in full, or uploaded anywhere.
 ```bash
 TS_DIR="${HOME}/.trapr" && mkdir -p "$TS_DIR"
 curl -fsSL -o "$TS_DIR/trapr.py" \
-  https://raw.githubusercontent.com/jaykrishna316/TrapR/v0.4.1/trapr.py
-python3 "$TS_DIR/trapr.py" --version        # expect 0.4.1
+  https://raw.githubusercontent.com/jaykrishna316/TrapR/v0.5.0/trapr.py
+python3 "$TS_DIR/trapr.py" --version        # expect 0.5.0
 ```
 
 If the release page lists a SHA-256 for `trapr.py`, verify it (`shasum -a 256` on macOS,
-`sha256sum` on Linux) and stop if it doesn't match. Alternatives: `pipx install trapr` or
-`uvx trapr`. Optional, for better detection in non-Python repos:
+`sha256sum` on Linux) and stop if it doesn't match. Alternative: `pip install git+https://github.com/jaykrishna316/TrapR`. Optional, for better detection in non-Python repos:
 `pip install tree-sitter tree-sitter-language-pack`.
 
 **Do not copy trapr.py into the user's repository.**

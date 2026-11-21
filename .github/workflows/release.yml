@@ -1,6 +1,5 @@
-# Push a tag like v0.4.1 to publish:
-#  - a GitHub release with trapr.py and its SHA-256 (for the curl install path)
-#  - the package on PyPI (trusted publishing: add this repo as a publisher on pypi.org first)
+# Push a tag like v0.5.0 to publish a GitHub release with trapr.py, its SHA-256 and the built package
+# (for the curl install path and the GitHub Action). Not published to PyPI.
 name: release
 on:
   push:
@@ -8,12 +7,10 @@ on:
 
 permissions:
   contents: write
-  id-token: write
 
 jobs:
   release:
     runs-on: ubuntu-latest
-    environment: pypi
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -37,5 +34,3 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" trapr.py SHA256SUMS dist/* \
             --title "$GITHUB_REF_NAME" --notes-file <(sed -n "/^## ${GITHUB_REF_NAME#v}/,/^## /p" CHANGELOG.md | sed '$d')
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
