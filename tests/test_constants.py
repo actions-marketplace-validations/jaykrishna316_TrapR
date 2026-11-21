@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: 2026 Jayakrishna Ichapurapu
+# build-id: 8113f5bb-95aa73ce
 """
 Canary-constant grading: a copy keeps a canary's math, so all of its constants travel together, in source code.
 A lone short constant, or any constant inside a data file, is a coincidence and must not be reported.
