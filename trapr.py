@@ -1515,27 +1515,179 @@ def report_path(args, data, vault: Path, kind: str) -> Path:
     return vault.parent / f"{data['name']}-{kind}-{dt.datetime.now().strftime('%Y%m%d-%H%M')}.md"
 
 
+# ============================================================================ cross-language similarity
+# A port (Python -> Node, Java -> Go, ...) keeps the logic and the literal values but changes every
+# keyword, identifier and type. So this layer maps keywords to language-neutral tokens, drops modifiers,
+# type words and punctuation that only some languages use, and compares the distinctive string and
+# number literals separately, because those almost always survive a port unchanged.
+# It is an investigative lead, never proof: the vault's markers are the proof.
+SIM_FAMILY = {
+    "def": "FUNC", "function": "FUNC", "func": "FUNC", "fn": "FUNC", "fun": "FUNC", "lambda": "FUNC",
+    "if": "IF", "elif": "IF", "else": "ELSE", "switch": "IF", "match": "IF", "case": "CASE",
+    "for": "LOOP", "foreach": "LOOP", "while": "LOOP", "do": "LOOP",
+    "return": "RET", "break": "BRK", "continue": "BRK",
+    "class": "CLASS", "struct": "CLASS", "interface": "CLASS",
+    "import": "IMPORT", "from": "IMPORT", "use": "IMPORT",
+    "try": "TRY", "except": "CATCH", "catch": "CATCH", "finally": "FIN",
+    "throw": "RAISE", "raise": "RAISE", "new": "NEW", "yield": "YIELD",
+    "self": "SELF", "this": "SELF",
+    "none": "NULL", "null": "NULL", "nil": "NULL", "undefined": "NULL",
+    "true": "TRUE", "false": "FALSE", "and": "&&", "or": "||", "not": "!",
+}
+# Modifiers, declaration keywords and type words: written by some languages, absent in others.
+SIM_DROP = set("""
+let var const val final static public private protected internal abstract async export package
+int integer long short byte float double bool boolean char string str void number object any unsigned
+signed pass as with in of is where mut ref go defer select chan map range type enum trait extends
+implements throws
+""".split())
+SIM_DROP_PUNCT = {"{", "}", ";", ":"}
+SIM_K, SIM_W = 10, 4          # winnowing window (smaller than the vault's, so short files still count)
+SIM_MIN_TOKENS = 40           # below this a file is too small to say anything
+SIM_MIN_SHARED = 5            # fingerprints two files must share before the overlap counts at all
+SIM_LIT_MIN_LEN = 6           # shorter string literals are too common to be evidence
+# Literals that many unrelated projects share (HTTP, JSON, common words). Never counted as evidence.
+SIM_COMMON_LITERALS = {
+    "application/json", "content-type", "text/plain", "text/html", "localhost", "utf-8", "error",
+    "charset", "true", "false", "default", "__main__", "method", "result", "message", "status",
+}
+
+
+def sim_tokens(text: str, ext: str) -> list[str]:
+    out = []
+    for t in TOKEN_RE.findall(strip_comments(text, ext)):
+        c = t[0]
+        if c in "\"'`":
+            out.append("S")
+        elif c.isdigit():
+            out.append("N")
+        elif c.isalpha() or c == "_":
+            if t in SIM_FAMILY:
+                out.append(SIM_FAMILY[t])
+            elif t in SIM_DROP or t in KEYWORDS:
+                continue
+            else:
+                out.append("V")
+        elif t not in SIM_DROP_PUNCT:
+            out.append(t)
+    return out
+
+
+SIM_COMMON_NUMBERS = {"0x7fffffff", "0xffffffff", "2147483647", "4294967295", "1000000", "100000"}
+SIM_IMPORT_LINE = re.compile(r"^\s*(import|from|export|package|using|use|require|#include)\b")
+
+
+def _distinctive_string(body: str) -> bool:
+    """A phrase (3+ words) or a hash-like token (letters and digits). Single words are everywhere."""
+    if len(body) >= 16 and len(body.split()) >= 3:
+        return True
+    return bool(re.fullmatch(r"[A-Za-z0-9_\-]{12,}", body) and re.search(r"\d", body)
+                and re.search(r"[A-Za-z]", body))
+
+
+def sim_literals(text: str, ext: str) -> set[str]:
+    stripped = strip_comments(text, ext)
+    out = set()
+    for t in TOKEN_RE.findall(stripped):
+        if t[0] in "\"'`":
+            body = t[1:-1].strip().lower()
+            if body not in SIM_COMMON_LITERALS and _distinctive_string(body):
+                out.add("s:" + body)
+    # numeric suffixes (Java/C 86400000L, 4096u) are the same number in every language
+    for n in re.findall(r"\b0x[0-9a-fA-F]{6,}\b|\b\d{6,}(?=[lLuU]{0,2}\b)", stripped):
+        n = re.sub(r"[lLuU]+$", "", n.lower())
+        if n not in SIM_COMMON_NUMBERS:
+            out.add("n:" + n)
+    return out
+
+
+def sim_source(text: str) -> str:
+    """Drop dependency lines: every project imports the same libraries, so they prove nothing."""
+    return "\n".join(ln for ln in text.splitlines() if not SIM_IMPORT_LINE.match(ln))
+
+
+def sim_record(p: Path) -> dict:
+    text, ext = read(p), p.suffix.lower()
+    toks = sim_tokens(sim_source(text), ext)
+    fp = winnow(toks, SIM_K, SIM_W) if len(toks) >= SIM_MIN_TOKENS else set()
+    return {"path": p, "fp": fp, "lits": sim_literals(text, ext)}
+
+
+def sim_compare(mine: list[dict], theirs: list[dict], threshold: float, lit_min: int) -> dict:
+    """Best containment of each of my files in any of their files, plus shared distinctive literals."""
+    pairs = []
+    qualifying = [m for m in mine if m["fp"]]
+    for m in qualifying:
+        best, best_t = 0.0, None
+        for t in theirs:
+            shared = len(m["fp"] & t["fp"])
+            if shared >= SIM_MIN_SHARED and shared / len(m["fp"]) > best:
+                best, best_t = shared / len(m["fp"]), t
+        if best_t is not None:
+            pairs.append({"mine": m["path"], "theirs": best_t["path"], "containment": round(best, 3)})
+    pairs.sort(key=lambda r: -r["containment"])
+    my_lits = set().union(*(m["lits"] for m in mine)) if mine else set()
+    their_lits = set().union(*(t["lits"] for t in theirs)) if theirs else set()
+    shared_lits = sorted(my_lits & their_lits)
+    strong = [p for p in pairs if p["containment"] >= threshold]
+    lead = bool(strong) or len(shared_lits) >= lit_min
+    return {"lead": lead, "pairs": pairs, "strong": strong, "shared_literals": shared_lits,
+            "my_files": len(qualifying), "my_literals": len(my_lits)}
+
+
+def cmd_similarity(args):
+    root = Path(args.repo_dir).resolve()
+    mine_paths = [p for p in repo_files(root, set(), tuple(args.include_dir or ())) if is_core(p.relative_to(root).as_posix())]
+    mine = [sim_record(p) for p in mine_paths]
+    tmp = Path(tempfile.mkdtemp(prefix="trapr-sim-"))
+    try:
+        target = resolve_target(args.target, tmp)
+        their_paths = [target] if target.is_file() else list(source_files(target))
+        theirs = [sim_record(p) for p in their_paths]
+        r = sim_compare(mine, theirs, args.threshold, args.lit_min)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    rel_t = lambda p: (p.relative_to(target).as_posix() if target.is_dir() and p.is_relative_to(target)
+                       else p.name)
+    print(f"\n🔎 Similarity: {root.name}  vs  {args.target}")
+    print(f"   {r['my_files']} of your files are large enough to compare; {r['my_literals']} distinctive literals")
+    if r["shared_literals"]:
+        print(f"   Shared distinctive literals ({len(r['shared_literals'])}):")
+        for lit in r["shared_literals"][:12]:
+            print(f"     · {lit[2:]}")
+    if r["pairs"]:
+        print("   Closest files (containment = share of your file's fingerprints found in theirs):")
+        for p in r["pairs"][:8]:
+            print(f"     {p['containment']:.2f}  {p['mine'].relative_to(root).as_posix()}  ↔  {rel_t(p['theirs'])}")
+    verdict = "LEAD for human review" if r["lead"] else "no lead"
+    print(f"   → {verdict}. A lead is a reason to look, not proof: the vault's markers are the proof.\n")
+
+
+def resolve_target(t: str, tmp: Path) -> Path:
+    """A local file or folder, a git URL (cloned into tmp), or a GitHub file URL (downloaded into tmp)."""
+    m = re.match(r"https://github\.com/([^/]+)/([^/]+)/blob/(.+)$", t)
+    if m:
+        raw = f"https://raw.githubusercontent.com/{m.group(1)}/{m.group(2)}/{m.group(3)}"
+        local = tmp / Path(m.group(3)).name
+        local.write_bytes(fetch(raw, github_token()))
+        return local
+    if t.startswith("https://raw.githubusercontent.com/"):
+        local = tmp / Path(urllib.parse.urlparse(t).path).name
+        local.write_bytes(fetch(t, github_token()))
+        return local
+    if re.match(r"(https://|git@)", t):
+        subprocess.run(["git", "clone", "--depth", "1", "--quiet", t, str(tmp / "repo")], check=True)
+        return tmp / "repo"
+    return Path(t).resolve()
+
+
 def cmd_verify(args):
     vault = Path(args.vault).resolve()
     data = load_vault(vault)
     t = args.target
     tmp = Path(tempfile.mkdtemp(prefix="trapr-"))
     try:
-        m = re.match(r"https://github\.com/([^/]+)/([^/]+)/blob/(.+)$", t)
-        if m:
-            raw = f"https://raw.githubusercontent.com/{m.group(1)}/{m.group(2)}/{m.group(3)}"
-            local = tmp / Path(m.group(3)).name
-            local.write_bytes(fetch(raw, github_token()))
-            target = local
-        elif t.startswith("https://raw.githubusercontent.com/"):
-            local = tmp / Path(urllib.parse.urlparse(t).path).name
-            local.write_bytes(fetch(t, github_token()))
-            target = local
-        elif re.match(r"(https://|git@)", t):
-            subprocess.run(["git", "clone", "--depth", "1", "--quiet", t, str(tmp / "repo")], check=True)
-            target = tmp / "repo"
-        else:
-            target = Path(t).resolve()
+        target = resolve_target(t, tmp)
         findings = scan_tree(target, data, args.min_score)
         for r in findings:
             if str(r["suspect"]).startswith(str(tmp)):
@@ -2176,6 +2328,16 @@ def main():
     p.add_argument("target")
     p.add_argument("--min-score", type=float, default=0.35)
     p.add_argument("--report")
+
+    p = sub.add_parser("similarity", help="compare your code with any repo, even after a port to another language")
+    p.set_defaults(fn=cmd_similarity)
+    p.add_argument("--repo-dir", default=".", help="your repository (default: current folder)")
+    p.add_argument("--target", required=True, help="folder, git URL, or GitHub file URL to compare with")
+    p.add_argument("--threshold", type=float, default=0.5,
+                   help="containment of one of your files in theirs that counts as a lead (default 0.5)")
+    p.add_argument("--lit-min", type=int, default=3,
+                   help="distinctive literals shared with the target that count as a lead (default 3)")
+    p.add_argument("--include-dir", action="append", help="hidden folder to include, e.g. .claude")
 
     p = sub.add_parser("hunt", help="search GitHub code, forks, PyPI and npm, and verify every hit")
     p.set_defaults(fn=cmd_hunt)
