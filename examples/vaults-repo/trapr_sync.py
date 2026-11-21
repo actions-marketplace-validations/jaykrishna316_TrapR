@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: 2026 Jayakrishna Ichapurapu
+# build-id: 8113f5bb-315f02c9
 """Keep TrapR markers and fingerprints current on your protected repos.
 
 Runs from your PRIVATE vaults repo (see trapr-sync.yml). For every project in trapr-sync.json and

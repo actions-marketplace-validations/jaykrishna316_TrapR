@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: 2026 Jayakrishna Ichapurapu
+# build-id: 8113f5bb-e02ab0aa
 """
 End-to-end tests for TrapR: protect a repo, then try to sneak copies past every layer.
 

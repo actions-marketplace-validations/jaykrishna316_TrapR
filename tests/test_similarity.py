@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: 2026 Jayakrishna Ichapurapu
+# build-id: 8113f5bb-399564a7
 """
 Cross-language similarity checks: a port (Python -> JavaScript, Python -> Java) of a module should
 read as a lead, an unrelated module should not.
